@@ -1,6 +1,7 @@
 ﻿public class BotConfig
 {
     public string DiscordToken { get; set; } = "";
+    public string OpenAIToken { get; set; } = "";
     public string RedisOption { get; set; } = "127.0.0.1,syncTimeout=3000";
     public ulong TestSlashCommandGuildId { get; set; } = 0;
     public string WebHookUrl { get; set; } = "";
@@ -19,25 +20,35 @@
 
         try
         {
-            var config = JsonConvert.DeserializeObject<BotConfig>(File.ReadAllText("bot_config.json"));
+            var config = JsonConvert.DeserializeObject<BotConfig>(File.ReadAllText("bot_config.json"))!;
 
             if (string.IsNullOrWhiteSpace(config.DiscordToken))
             {
-                Log.Error("DiscordToken遺失，請輸入至bot_config.json後重開Bot");
+                Log.Error($"{nameof(DiscordToken)}遺失，請輸入至bot_config.json後重開Bot");
                 if (!Console.IsInputRedirected)
                     Console.ReadKey();
                 Environment.Exit(3);
             }
 
+            if (string.IsNullOrWhiteSpace(config.OpenAIToken))
+            {
+                Log.Error($"{nameof(OpenAIToken)}遺失，請輸入至bot_config.json後重開Bot");
+                if (!Console.IsInputRedirected)
+                    Console.ReadKey();
+                Environment.Exit(3);
+            }
+
+
             if (string.IsNullOrWhiteSpace(config.WebHookUrl))
             {
-                Log.Error("WebHookUrl遺失，請輸入至bot_config.json後重開Bot");
+                Log.Error($"{nameof(WebHookUrl)}遺失，請輸入至bot_config.json後重開Bot");
                 if (!Console.IsInputRedirected)
                     Console.ReadKey();
                 Environment.Exit(3);
             }
 
             DiscordToken = config.DiscordToken;
+            OpenAIToken = config.OpenAIToken;
             WebHookUrl = config.WebHookUrl;
             TestSlashCommandGuildId = config.TestSlashCommandGuildId;
             RedisOption = config.RedisOption;
