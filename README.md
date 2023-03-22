@@ -1,1 +1,3 @@
 # DiscordChatGPTBot
+
+Work In Process
