@@ -3,7 +3,6 @@ using System.Reflection;
 
 #if DEBUG
 using System.Text.RegularExpressions;
-using System.Collections.Generic;
 #endif
 
 namespace DiscordChatGPTBot.Interaction

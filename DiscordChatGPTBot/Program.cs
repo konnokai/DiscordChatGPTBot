@@ -46,6 +46,16 @@ namespace DiscordChatGPTBot
             botConfig.InitBotConfig();
             timerUpdateStatus = new Timer(TimerHandler);
 
+            if (!Directory.Exists(Path.GetDirectoryName(GetDataFilePath(""))))
+                Directory.CreateDirectory(Path.GetDirectoryName(GetDataFilePath(""))!);
+
+            using (var db = new DataBase.MainDbContext())
+            {
+                if (!File.Exists(GetDataFilePath("DataBase.db")))
+                {
+                    db.Database.EnsureCreated();
+                }
+            }
 
             try
             {
@@ -62,10 +72,6 @@ namespace DiscordChatGPTBot
                 Log.Error(ex.Message);
                 return;
             }
-
-            if (!Directory.Exists(Path.GetDirectoryName(GetDataFilePath(""))))
-                Directory.CreateDirectory(Path.GetDirectoryName(GetDataFilePath(""))!);
-
             new Program().MainAsync().GetAwaiter().GetResult();
         }
 
@@ -181,7 +187,34 @@ namespace DiscordChatGPTBot
                         if (File.Exists(GetDataFilePath("CommandCount.bin")))
                             commandCount = BitConverter.ToInt32(File.ReadAllBytes(GetDataFilePath("CommandCount.bin")));
 
-                        if (commandCount == iService.GetService<InteractionHandler>().CommandCount) return;
+                        if (commandCount != iService.GetService<InteractionHandler>().CommandCount)
+                        {
+                            try
+                            {
+                                foreach (var item in interactionService.Modules.Where((x) => x.Preconditions.Any((x) => x is Interaction.Attribute.RequireGuildAttribute)))
+                                {
+                                    var guildId = ((Interaction.Attribute.RequireGuildAttribute)item.Preconditions.FirstOrDefault((x) => x is Interaction.Attribute.RequireGuildAttribute)).GuildId;
+                                    var guild = _client.GetGuild(guildId.Value);
+
+                                    if (guild == null)
+                                    {
+                                        Log.Warn($"{item.Name} 註冊失敗，伺服器 {guildId} 不存在");
+                                        continue;
+                                    }
+
+                                    var result = await interactionService.AddModulesToGuildAsync(guild, false, item);
+                                    Log.Info($"已在 {guild.Name}({guild.Id}) 註冊指令: {string.Join(", ", item.SlashCommands.Select((x) => x.Name))}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Error(ex, "註冊伺服器專用Slash指令失敗");
+                            }
+
+                            await iService.GetService<InteractionService>().RegisterCommandsGloballyAsync();
+                            File.WriteAllBytes(GetDataFilePath("CommandCount.bin"), BitConverter.GetBytes(iService.GetService<InteractionHandler>().CommandCount));
+                            Log.Info("已註冊全球指令");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -192,31 +225,6 @@ namespace DiscordChatGPTBot
                         isDisconnect = true;
                         return;
                     }
-
-                    try
-                    {
-                        foreach (var item in interactionService.Modules.Where((x) => x.Preconditions.Any((x) => x is Interaction.Attribute.RequireGuildAttribute)))
-                        {
-                            var guildId = ((Interaction.Attribute.RequireGuildAttribute)item.Preconditions.FirstOrDefault((x) => x is Interaction.Attribute.RequireGuildAttribute)).GuildId;
-                            var guild = _client.GetGuild(guildId.Value);
-
-                            if (guild == null)
-                            {
-                                Log.Warn($"{item.Name} 註冊失敗，伺服器 {guildId} 不存在");
-                                continue;
-                            }
-
-                            var result = await interactionService.AddModulesToGuildAsync(guild, false, item);
-                            Log.Info($"已在 {guild.Name}({guild.Id}) 註冊指令: {string.Join(", ", item.SlashCommands.Select((x) => x.Name))}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "註冊伺服器專用Slash指令失敗");
-                    }
-
-                    await interactionService.RegisterCommandsGloballyAsync();
-                    Log.Info("已註冊全球指令");
                 }
                 catch (Exception ex)
                 {
