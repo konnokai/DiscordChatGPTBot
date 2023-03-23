@@ -3,5 +3,5 @@ services:
   discord-chat-gpt:
     build: .
     volumes:
-      - ./Data:/src/DiscordChatGPTBot/Data
-      - ./config.json:/src/DiscordChatGPTBot/config.json
+      - ./Data:/app/Data
+      - ./bot_config.json:/app/bot_config.json
