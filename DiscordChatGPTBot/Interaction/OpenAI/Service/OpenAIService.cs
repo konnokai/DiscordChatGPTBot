@@ -39,7 +39,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
         {
             if (_runningChannels.Contains(context.Channel.Id))
             {
-                await context.Interaction.SendErrorAsync("還有回應尚未完成");
+                await context.Interaction.SendErrorAsync("還有回應尚未完成", true);
                 return;
             }
 
