@@ -73,15 +73,15 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
                     catch { }
                     _runningChannels.Remove(context.Channel.Id);
                 }
-                catch (Exception ex)
+                catch (TaskCanceledException ex)
                 {
-                    Log.Error(ex, "Talk Timeout");
-                    await msg.ModifyAsync((act) => act.Content = "等待訊息失敗: 逾時");
+                    Log.Error("Talk Timeout");
+                    await msg.ModifyAsync((act) => act.Content = "等待訊息失敗: 逾時，請重新再試");
                     _runningChannels.Remove(context.Channel.Id);
                 }
             });
 
-            var waitingTask = Task.Delay(TimeSpan.FromSeconds(10), cts2.Token);
+            var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
             var completedTask = await Task.WhenAny(mainTask, waitingTask);
             if (completedTask == waitingTask && !waitingTask.IsCanceled)
             {
@@ -90,6 +90,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
             }
 
             await mainTask;
+            _runningChannels.Remove(context.Channel.Id);
         }
 
         public void ForceReset(ulong guildId, ulong channelId)
