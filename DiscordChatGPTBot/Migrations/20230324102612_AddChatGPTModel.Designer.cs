@@ -3,6 +3,7 @@ using System;
 using DiscordChatGPTBot.DataBase;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DiscordChatGPTBot.Migrations
 {
     [DbContext(typeof(MainDbContext))]
-    partial class DbContextModelSnapshot : ModelSnapshot
+    [Migration("20230324102612_AddChatGPTModel")]
+    partial class AddChatGPTModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "6.0.15");

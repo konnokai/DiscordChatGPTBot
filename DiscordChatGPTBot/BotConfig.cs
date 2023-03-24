@@ -1,7 +1,7 @@
 ﻿public class BotConfig
 {
     public string DiscordToken { get; set; } = "";
-    public string OpenAIToken { get; set; } = "";
+    public string AESKey { get; set; } = "";
     public string RedisOption { get; set; } = "127.0.0.1,syncTimeout=3000";
     public ulong TestSlashCommandGuildId { get; set; } = 0;
     public string WebHookUrl { get; set; } = "";
@@ -30,15 +30,6 @@
                 Environment.Exit(3);
             }
 
-            if (string.IsNullOrWhiteSpace(config.OpenAIToken))
-            {
-                Log.Error($"{nameof(OpenAIToken)}遺失，請輸入至bot_config.json後重開Bot");
-                if (!Console.IsInputRedirected)
-                    Console.ReadKey();
-                Environment.Exit(3);
-            }
-
-
             if (string.IsNullOrWhiteSpace(config.WebHookUrl))
             {
                 Log.Error($"{nameof(WebHookUrl)}遺失，請輸入至bot_config.json後重開Bot");
@@ -47,8 +38,15 @@
                 Environment.Exit(3);
             }
 
+            if (string.IsNullOrEmpty(config.AESKey))
+            {
+                Log.Warn($"{nameof(AESKey)}遺失，自動產生...");
+                config.AESKey = GenRandomKey();
+                File.WriteAllText("bot_config.json", JsonConvert.SerializeObject(config, Formatting.Indented));
+            }
+
             DiscordToken = config.DiscordToken;
-            OpenAIToken = config.OpenAIToken;
+            AESKey = config.AESKey;
             WebHookUrl = config.WebHookUrl;
             TestSlashCommandGuildId = config.TestSlashCommandGuildId;
             RedisOption = config.RedisOption;
@@ -59,5 +57,20 @@
             Log.Error(ex, "設定檔讀取失敗");
             throw;
         }
+    }
+
+    private static string GenRandomKey()
+    {
+        var characters = "ABCDEF_GHIJKLMNOPQRSTUVWXYZ@abcdefghijklmnopqrstuvwx-yz0123456789";
+        var Charsarr = new char[128];
+        var random = new Random();
+
+        for (int i = 0; i < Charsarr.Length; i++)
+        {
+            Charsarr[i] = characters[random.Next(characters.Length)];
+        }
+
+        var resultString = new string(Charsarr);
+        return resultString;
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Discord.Interactions;
+using DiscordChatGPTBot.Auth;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
@@ -9,21 +10,19 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
 {
     public class OpenAIService : IInteractionService
     {
-        private readonly OpenAIClient _openAIClient;
-        private readonly ConcurrentDictionary<string, List<ChatPrompt>> _chatPrompt;
-        private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp;
-        private readonly ConcurrentDictionary<ulong, ushort> _turns;
-        private readonly List<DataBase.Table.ChannelConfig> _channelConfigs = new List<DataBase.Table.ChannelConfig>();
-        private readonly HashSet<ulong> _runningChannels = new HashSet<ulong>();
+        private readonly ConcurrentDictionary<string, List<ChatPrompt>> _chatPrompt = new();
+        private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
+        private readonly ConcurrentDictionary<ulong, ushort> _turns = new();
+        private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
+        private readonly List<DataBase.Table.ChannelConfig> _channelConfigs = new();
+        private readonly HashSet<ulong> _runningChannels = new();
+        private readonly BotConfig _botConfig;
 
         public OpenAIService(BotConfig botConfig)
         {
-            _openAIClient = new OpenAIClient(new OpenAIAuthentication(botConfig.OpenAIToken));
-            _chatPrompt = new();
-            _lastSendMessageTimestamp = new();
-            _turns = new();
-
+            _botConfig = botConfig;
             RefreshChannelConfig();
+            RefreshGuildConfig();
         }
 
         public void RefreshChannelConfig()
@@ -31,7 +30,19 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
                 _channelConfigs.Clear();
-                _channelConfigs.AddRange(db.ChannelConfig);
+                _channelConfigs.AddRange(db.ChannelConfig);                
+            }
+        }
+
+        public void RefreshGuildConfig()
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                _guildOpenAIKey.Clear();
+                foreach (var item in db.GuildConfig)
+                {
+                    _guildOpenAIKey.AddOrUpdate(item.GuildId, item.OpenAIKey, (guildId, apiKey) => item.OpenAIKey);
+                }
             }
         }
 
@@ -75,6 +86,10 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
                         catch { }
                     }
                     catch (TaskCanceledException) { }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "HandleAIChat");
+                    }
                 });
 
                 var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
@@ -126,6 +141,15 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
 
         private async IAsyncEnumerable<string> ChatToAIAsync(ulong guildId, ulong channelId, ulong userId, string chat, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            if (!_guildOpenAIKey.TryGetValue(guildId, out string? apiKey))
+                throw new InvalidOperationException("APIKey未設置");
+
+            string desKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
+            if (string.IsNullOrEmpty(desKey) || desKey.Length != 51)
+                throw new InvalidOperationException("APIKey解密失敗");
+
+            OpenAIClient _openAIClient = new OpenAIClient(desKey);
+
             var chatPrompts = GetOrAddChatPrompt(channelId);
             chatPrompts.AddChat("user", chat);
 

@@ -72,6 +72,7 @@ namespace DiscordChatGPTBot
                 Log.Error(ex.Message);
                 return;
             }
+
             new Program().MainAsync().GetAwaiter().GetResult();
         }
 

@@ -1,18 +1,96 @@
 ﻿using Discord.Interactions;
+using DiscordChatGPTBot.Auth;
 using DiscordChatGPTBot.DataBase.Table;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
     public class OpenAI : TopLevelModule<Service.OpenAIService>
     {
-        [SlashCommand("init", "初始化")]
+        private readonly BotConfig _botConfig;
+
+        public OpenAI(BotConfig botConfig)
+        {
+            _botConfig = botConfig;
+        }
+
+        [SlashCommand("init", "初始化或更新本伺服器的OpenAI API設定")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task Initialization([Summary("system-prompt", "人設，可使用 \"/set-system-prompt\" 變更")] string prompt = "你是一個有幫助的助手。")
+        public async Task Initialization([Summary("open-ai-api-key", "OpenAI的API Key")] string apiKey)
+        {
+            if (!apiKey.StartsWith("sk-") || apiKey.Length != 51)
+            {
+                await Context.Interaction.SendErrorAsync("OpenAI API Key格式錯誤，請輸入正確的API Key", false, true);
+                return;
+            }
+
+            string encToken = TokenManager.CreateToken(apiKey, _botConfig.AESKey);
+
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
+                if (guildConfig == null)
+                {
+                    guildConfig = new GuildConfig() { GuildId = Context.Guild.Id, OpenAIKey = encToken };
+                    db.GuildConfig.Add(guildConfig);
+                }
+                else
+                {
+                    guildConfig.OpenAIKey = encToken;
+                    db.GuildConfig.Update(guildConfig);
+                }
+
+                db.SaveChanges();
+                _service.RefreshGuildConfig();
+
+                await Context.Interaction.SendConfirmAsync("已更新OpenAI API Key");
+            }
+        }
+
+        [SlashCommand("revoke", "撤銷本伺服器的OpenAI API Key並取消使用ChatGPT聊天功能")]
+        [RequireContext(ContextType.Guild)]
+        [DefaultMemberPermissions(GuildPermission.Administrator)]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task Revoke()
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
+                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
+                if (guildConfig == null)
+                {
+                    await Context.Interaction.SendErrorAsync("本伺服器未初始化，無法撤銷");
+                    return;
+                }
+
+                if (await PromptUserConfirmAsync("撤銷API Key將會連同移除本伺服器的ChatGPT聊天設定，是否繼續?"))
+                {
+                    db.GuildConfig.Remove(guildConfig);
+                    db.ChannelConfig.RemoveRange(db.ChannelConfig.Where((x) => x.GuildId == Context.Guild.Id));
+                    db.SaveChanges();
+
+                    _service.RefreshGuildConfig();
+
+                    await Context.Interaction.SendConfirmAsync("已撤銷", true);
+                }
+            }
+        }
+
+        [SlashCommand("active", "在此頻道啟用ChatGPT聊天功能")]
+        [RequireContext(ContextType.Guild)]
+        [DefaultMemberPermissions(GuildPermission.Administrator)]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task Active([Summary("system-prompt", "人設，可變更")] string prompt = "你是一個有幫助的助手。")
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
+                if (guildConfig == null)
+                {
+                    await Context.Interaction.SendErrorAsync("本伺服器未初始化，請使用 `/init` 後再試");
+                    return;
+                }
+
                 ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
                 if (channelConfig != null)
                 {
@@ -25,28 +103,28 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 _service.RefreshChannelConfig();
 
-                await Context.Interaction.SendConfirmAsync($"已在此頻道啟用AI對話功能\n" +
+                await Context.Interaction.SendConfirmAsync($"已在此頻道啟用ChatGPT對話功能\n" +
                     $"如需更改人設請使用 `/set-system-prompt`\n" +
                     $"如需關閉請使用 `/toggle`\n" +
-                    $"AI人設:\n" +
+                    $"ChatGPT人設:\n" +
                     $"```\n" +
                     $"{prompt}\n" +
                     $"```");
             }
         }
 
-        [SlashCommand("set-system-prompt", "設定AI的人設")]
+        [SlashCommand("set-system-prompt", "設定ChatGPT的人設")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetSystemPrompt(string prompt)
+        public async Task SetSystemPrompt([Summary("system-prompt", "人設，可使用 \"/set-system-prompt\" 變更")] string prompt = "你是一個有幫助的助手。")
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
                 ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
                 if (channelConfig == null)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未啟用AI聊天功能，請使用 `/init` 後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道尚未啟ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
                 }
 
@@ -54,13 +132,33 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 db.ChannelConfig.Update(channelConfig);
                 db.SaveChanges();
 
-                await Context.Interaction.SendConfirmAsync("已更新AI人設:\n" +
+                await Context.Interaction.SendConfirmAsync("已更新ChatGPT人設:\n" +
                     $"```\n" +
                     $"{prompt}\n" +
                     $"```");
 
                 _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
                 _service.RefreshChannelConfig();
+            }
+        }
+
+        [SlashCommand("show-system-prompt", "顯示ChatGPT的人設")]
+        [RequireContext(ContextType.Guild)]
+        public async Task ShowSystemPrompt()
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                if (channelConfig == null)
+                {
+                    await Context.Interaction.SendErrorAsync("本頻道尚未啟用ChatGPT聊天功能，請使用 `/active` 後再試");
+                    return;
+                }
+
+                await Context.Interaction.SendConfirmAsync("本頻道的ChatGPT人設:\n" +
+                    $"```\n" +
+                    $"{channelConfig.SystemPrompt}\n" +
+                    $"```");
             }
         }
 
@@ -75,7 +173,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
                 if (channelConfig == null)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未啟用AI聊天功能，請使用 `/init` 後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道尚未啟用ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
                 }
 
@@ -83,13 +181,13 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 db.ChannelConfig.Update(channelConfig);
                 db.SaveChanges();
 
-                await Context.Interaction.SendConfirmAsync("已切換AI聊天功能為: " + (channelConfig.IsEnable ? "開啟" : "關閉"));
+                await Context.Interaction.SendConfirmAsync("已切換ChatGPT聊天功能為: " + (channelConfig.IsEnable ? "開啟" : "關閉"));
                 _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
                 _service.RefreshChannelConfig();
             }
         }
 
-        [SlashCommand("say", "跟AI對話")]
+        [SlashCommand("say", "跟ChatGPT對話")]
         [RequireContext(ContextType.Guild)]
         public async Task Say(string message)
         {
@@ -99,13 +197,13 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
                 if (channelConfig == null)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未初始化AI聊天功能，請使用 `/init` 後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道尚未初始化ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
                 }
 
                 if (!channelConfig.IsEnable)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道已關閉AI聊天功能，請使用 `/toggle` 開啟後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道已關閉ChatGPT聊天功能，請使用 `/toggle` 開啟後再試");
                     return;
                 }
             }

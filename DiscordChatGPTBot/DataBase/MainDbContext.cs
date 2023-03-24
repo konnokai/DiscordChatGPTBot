@@ -6,6 +6,7 @@ namespace DiscordChatGPTBot.DataBase
 {
     public class MainDbContext : DbContext
     {
+        public DbSet<GuildConfig> GuildConfig { get; set; }
         public DbSet<ChannelConfig> ChannelConfig { get; set; }
         public DbSet<ChatHistroy> ChatHistroy { get; set; }
 
