@@ -49,48 +49,55 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
 
             var msg = await context.Interaction.FollowupAsync("等待回應中...");
 
-            var cts = new CancellationTokenSource();
-            var cts2 = new CancellationTokenSource();
-
-            var mainTask = Task.Run(async () =>
+            do
             {
-                try
+                var cts = new CancellationTokenSource();
+                var cts2 = new CancellationTokenSource();
+
+                var mainTask = Task.Run(async () =>
                 {
-                    string result = "";
-                    await foreach (var item in ChatToAIAsync(context.Guild.Id, context.Channel.Id, context.User.Id, message, cts.Token))
+                    try
                     {
-                        result += item;
-                        if (!cts2.IsCancellationRequested) cts2.Cancel();
-
-                        if (result.EndWithDelim())
+                        string result = "";
+                        await foreach (var item in ChatToAIAsync(context.Guild.Id, context.Channel.Id, context.User.Id, message, cts.Token))
                         {
-                            try { await msg.ModifyAsync((act) => act.Content = result); }
-                            catch { }
+                            result += item;
+                            if (!cts2.IsCancellationRequested) cts2.Cancel();
+
+                            if (result.EndWithDelim())
+                            {
+                                try { await msg.ModifyAsync((act) => act.Content = result); }
+                                catch { }
+                            }
                         }
+
+                        try { await msg.ModifyAsync((act) => act.Content = result); }
+                        catch { }
                     }
+                    catch (TaskCanceledException) { }
+                });
 
-                    try { await msg.ModifyAsync((act) => act.Content = result); }
-                    catch { }
-                    _runningChannels.Remove(context.Channel.Id);
-                }
-                catch (TaskCanceledException ex)
+                var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
+                var completedTask = await Task.WhenAny(mainTask, waitingTask);
+                if (completedTask == waitingTask && !waitingTask.IsCanceled)
                 {
-                    Log.Error("Talk Timeout");
-                    await msg.ModifyAsync((act) => act.Content = "等待訊息失敗: 逾時，請重新再試");
-                    _runningChannels.Remove(context.Channel.Id);
+                    // 如果等待Task先完成，就取消主要的Task
+                    cts.Cancel();
+
+                    await msg.ModifyAsync((act) => act.Content = "等待訊息逾時，嘗試重新讀取中...");
+                    await Task.Delay(3000);
+                    await msg.ModifyAsync((act) => act.Content = "等待回應中...");
                 }
-            });
+                else
+                {
+                    break;
+                }
 
-            var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
-            var completedTask = await Task.WhenAny(mainTask, waitingTask);
-            if (completedTask == waitingTask && !waitingTask.IsCanceled)
-            {
-                // 如果等待Task先完成，就取消主要的Task
-                cts.Cancel();
-            }
+                await mainTask;
+            } while (true);
 
-            await mainTask;
             _runningChannels.Remove(context.Channel.Id);
+            _turns.AddOrUpdate(context.Channel.Id, 1, (channelId, turn) => turn++);
         }
 
         public void ForceReset(ulong guildId, ulong channelId)
@@ -112,6 +119,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
             {
                 _chatPrompt.TryRemove($"{context.Channel.Id}", out var _);
                 _turns.TryRemove(context.Channel.Id, out var _);
+                _lastSendMessageTimestamp.AddOrUpdate(context.Channel.Id, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
                 await context.Interaction.SendConfirmAsync("已重置歷史訊息", true);
             }
         }
