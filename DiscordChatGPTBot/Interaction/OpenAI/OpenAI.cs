@@ -13,12 +13,12 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             _botConfig = botConfig;
         }
 
-        private async Task<GuildConfig?> EnsureGuildIsInitAndGetConfigAsync()
+        private async Task<GuildConfig?> EnsureGuildIsInitAndGetConfigAsync(bool sendErrorMsg = true)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
                 var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
-                if (guildConfig == null)
+                if (guildConfig == null && sendErrorMsg)
                     await Context.Interaction.SendErrorAsync("本伺服器未初始化，請使用 `/init` 後再試");
 
                 return guildConfig;
@@ -45,7 +45,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         {
             if (!apiKey.StartsWith("sk-") || apiKey.Length != 51)
             {
-                await Context.Interaction.SendErrorAsync("OpenAI API Key格式錯誤，請輸入正確的API Key", false, true);
+                await Context.Interaction.SendErrorAsync("OpenAI API Key格式錯誤，請輸入正確的API Key");
                 return;
             }
 
@@ -116,7 +116,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 {
                     await Context.Interaction.SendErrorAsync("本頻道已啟用\n" +
                         $"如需更改人設請使用 `/set-system-prompt`\n" +
-                        $"如需關閉請使用 `/toggle`");
+                        $"如需切換開關請使用 `/toggle`");
                     return;
                 }
 
@@ -127,7 +127,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 await Context.Interaction.SendConfirmAsync($"已在此頻道啟用ChatGPT對話功能\n" +
                     $"如需更改人設請使用 `/set-system-prompt`\n" +
-                    $"如需關閉請使用 `/toggle`\n" +
+                    $"如需切換開關請使用 `/toggle`\n" +
                     $"ChatGPT人設:\n" +
                     $"```\n" +
                     $"{prompt}\n" +
@@ -213,7 +213,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 if (!channelConfig.IsEnable)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道已關閉ChatGPT聊天功能，請使用 `/toggle` 開啟後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試");
                     return;
                 }
             }
