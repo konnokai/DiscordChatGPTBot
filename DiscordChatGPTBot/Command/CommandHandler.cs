@@ -8,12 +8,14 @@ namespace DiscordChatGPTBot.Command
         private readonly DiscordSocketClient _client;
         private readonly CommandService _commands;
         private readonly IServiceProvider _services;
+        private readonly SharedService.OpenAI.OpenAIService _openAIService;
 
-        public CommandHandler(IServiceProvider services, CommandService commands, DiscordSocketClient client)
+        public CommandHandler(IServiceProvider services, CommandService commands, DiscordSocketClient client, SharedService.OpenAI.OpenAIService openAIService)
         {
             _commands = commands;
             _services = services;
             _client = client;
+            _openAIService = openAIService;
         }
 
         public async Task InitializeAsync()
@@ -30,7 +32,7 @@ namespace DiscordChatGPTBot.Command
             if (message == null || message.Author.IsBot) return;
 
             int argPos = 0;
-            if (message.HasStringPrefix("s!", ref argPos))
+            if (message.HasStringPrefix("c!", ref argPos))
             {
                 var context = new SocketCommandContext(_client, message);
 
@@ -49,11 +51,16 @@ namespace DiscordChatGPTBot.Command
                     }
                     else
                     {
-                        try { if (context.Message.Author.Id == Program.ApplicatonOwner.Id || context.Message.CleanContent == "s!ymlc") await message.DeleteAsync(); }
+                        try { if (context.Message.Author.Id == Program.ApplicatonOwner.Id) await message.DeleteAsync(); }
                         catch { }
                         Log.FormatColorWrite($"[{context.Guild?.Name}/{context.Message.Channel?.Name}] {message.Author.Username} 執行 {context.Message}", ConsoleColor.DarkYellow);
                     }
                 }
+            }
+            else if (message.Channel is SocketTextChannel channel && message.MentionedUsers.Any((x) => x.Id == _client.CurrentUser.Id))
+            {
+                var messageWithoutUser = message.CleanContent.Replace($"@{_client.CurrentUser}", "").Trim();
+                await _openAIService.HandleAIChat(channel.Guild.Id, channel, message.Author.Id, messageWithoutUser);
             }
         }
     }

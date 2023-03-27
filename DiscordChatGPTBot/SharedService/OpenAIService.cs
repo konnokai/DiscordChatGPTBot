@@ -1,12 +1,12 @@
-﻿using Discord.Interactions;
-using DiscordChatGPTBot.Auth;
+﻿using DiscordChatGPTBot.Auth;
+using DiscordChatGPTBot.Interaction;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
-namespace DiscordChatGPTBot.Interaction.OpenAI.Service
+namespace DiscordChatGPTBot.SharedService.OpenAI
 {
     public class OpenAIService : IInteractionService
     {
@@ -30,7 +30,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
                 _channelConfigs.Clear();
-                _channelConfigs.AddRange(db.ChannelConfig);                
+                _channelConfigs.AddRange(db.ChannelConfig);
             }
         }
 
@@ -46,19 +46,19 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
             }
         }
 
-        public async Task HandleAIChat(SocketInteractionContext context, string message)
+        public async Task HandleAIChat(ulong guildId, ISocketMessageChannel channel, ulong userId, string message)
         {
-            if (_runningChannels.Contains(context.Channel.Id))
+            if (_runningChannels.Contains(channel.Id))
             {
-                await context.Interaction.SendErrorAsync("還有回應尚未完成", true);
+                await channel.SendMessageAsync("還有回應尚未完成");
                 return;
             }
 
-            _runningChannels.Add(context.Channel.Id);
+            _runningChannels.Add(channel.Id);
 
-            await CheckReset(context);
+            await CheckReset(guildId, channel);
 
-            var msg = await context.Interaction.FollowupAsync("等待回應中...");
+            var msg = await channel.SendMessageAsync("等待回應中...");
 
             do
             {
@@ -70,7 +70,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
                     try
                     {
                         string result = "";
-                        await foreach (var item in ChatToAIAsync(context.Guild.Id, context.Channel.Id, context.User.Id, message, cts.Token))
+                        await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token))
                         {
                             result += item;
                             if (!cts2.IsCancellationRequested) cts2.Cancel();
@@ -114,8 +114,8 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
                 await mainTask;
             } while (true);
 
-            _runningChannels.Remove(context.Channel.Id);
-            _turns.AddOrUpdate(context.Channel.Id, 1, (channelId, turn) => turn++);
+            _runningChannels.Remove(channel.Id);
+            _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
         }
 
         public void ForceReset(ulong guildId, ulong channelId)
@@ -126,19 +126,19 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
             _turns.TryRemove(channelId, out var _);
         }
 
-        private async Task CheckReset(SocketInteractionContext context)
+        private async Task CheckReset(ulong guildId, ISocketMessageChannel channel)
         {
-            var channelConfig = _channelConfigs.SingleOrDefault((x) => x.GuildId == context.Guild.Id && x.ChannelId == context.Channel.Id) ?? throw new InvalidOperationException("資料庫無此頻道的資料");
-            var dateTime = _lastSendMessageTimestamp.GetOrAdd(context.Channel.Id, DateTime.Now);
-            bool isTurnsMax = _turns.ContainsKey(context.Channel.Id) && _turns[context.Channel.Id] > channelConfig.MaxTurns;
+            var channelConfig = _channelConfigs.SingleOrDefault((x) => x.GuildId == guildId && x.ChannelId == channel.Id) ?? throw new InvalidOperationException("資料庫無此頻道的資料");
+            var dateTime = _lastSendMessageTimestamp.GetOrAdd(channel.Id, DateTime.Now);
+            bool isTurnsMax = _turns.ContainsKey(channel.Id) && _turns[channel.Id] > channelConfig.MaxTurns;
             bool isNeedResetTime = DateTime.Now.Subtract(dateTime).TotalSeconds > channelConfig.ResetDeltaTime;
 
             if (isTurnsMax || isNeedResetTime)
             {
-                _chatPrompt.TryRemove($"{context.Channel.Id}", out var _);
-                _turns.TryRemove(context.Channel.Id, out var _);
-                _lastSendMessageTimestamp.AddOrUpdate(context.Channel.Id, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
-                await context.Interaction.SendConfirmAsync("已重置歷史訊息", true);
+                _chatPrompt.TryRemove($"{channel.Id}", out var _);
+                _turns.TryRemove(channel.Id, out var _);
+                _lastSendMessageTimestamp.AddOrUpdate(channel.Id, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
+                await channel.SendMessageAsync("已重置歷史訊息");
             }
         }
 
@@ -179,7 +179,9 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
                     yield return result.FirstChoice.Delta.Content;
                 }
 
-                //result.Usage.TotalTokens
+                // Todo: 確認Token的使用量
+                // 目前Library回傳不了使用量導致無法確認還有多少Token可用
+                // result.Usage.TotalTokens
             }
 
             chatPrompts.AddChat(role, completionMessage);

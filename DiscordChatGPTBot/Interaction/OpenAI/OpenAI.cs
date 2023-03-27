@@ -1,10 +1,11 @@
 ﻿using Discord.Interactions;
 using DiscordChatGPTBot.Auth;
 using DiscordChatGPTBot.DataBase.Table;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
-    public class OpenAI : TopLevelModule<Service.OpenAIService>
+    public class OpenAI : TopLevelModule<SharedService.OpenAI.OpenAIService>
     {
         private readonly BotConfig _botConfig;
 
@@ -216,11 +217,10 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 }
             }
 
-            await DeferAsync();
-
             try
             {
-                await _service.HandleAIChat(Context, message);
+                await Context.Interaction.SendConfirmAsync($"{Context.User}: {message}");
+                await _service.HandleAIChat(Context.Guild.Id, Context.Channel, Context.User.Id, message);
             }
             catch (Exception ex)
             {

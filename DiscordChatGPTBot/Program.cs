@@ -119,6 +119,7 @@ namespace DiscordChatGPTBot
             #region 初始化互動指令系統
             var interactionServices = new ServiceCollection()
                 .AddHttpClient()
+                .AddSingleton<SharedService.OpenAI.OpenAIService>()
                 .AddSingleton(_client)
                 .AddSingleton(botConfig)
                 .AddSingleton(new InteractionService(_client, new InteractionServiceConfig()
@@ -140,6 +141,7 @@ namespace DiscordChatGPTBot
             #region 初始化一般指令系統
             var commandServices = new ServiceCollection()
                 .AddHttpClient()
+                .AddSingleton(iService.GetService<SharedService.OpenAI.OpenAIService>())
                 .AddSingleton(_client)
                 .AddSingleton(botConfig)
                 .AddSingleton(new CommandService(new CommandServiceConfig()
