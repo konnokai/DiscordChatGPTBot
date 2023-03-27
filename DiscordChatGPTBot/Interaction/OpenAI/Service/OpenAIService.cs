@@ -75,6 +75,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
                             result += item;
                             if (!cts2.IsCancellationRequested) cts2.Cancel();
 
+                            result = result.Replace("\n\n", "\n");
                             if (result.EndWithDelim())
                             {
                                 try { await msg.ModifyAsync((act) => act.Content = result); }
@@ -84,6 +85,8 @@ namespace DiscordChatGPTBot.Interaction.OpenAI.Service
 
                         try { await msg.ModifyAsync((act) => act.Content = result); }
                         catch { }
+
+                        Log.New($"回應: {result}");
                     }
                     catch (TaskCanceledException) { }
                     catch (Exception ex)
