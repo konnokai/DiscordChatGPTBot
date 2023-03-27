@@ -45,22 +45,30 @@ namespace DiscordChatGPTBot.Command
 
                     if (!result.IsSuccess)
                     {
-                        Log.FormatColorWrite($"[{context.Guild?.Name}/{context.Message.Channel?.Name}] {message.Author.Username} 執行 {context.Message} 發生錯誤", ConsoleColor.Red);
-                        Log.FormatColorWrite(result.ErrorReason, ConsoleColor.Red);
+                        Log.Error($"[{context.Guild?.Name}/{context.Message.Channel?.Name}] {message.Author.Username} 執行 {context.Message} 發生錯誤");
+                        Log.Error(result.ErrorReason);
                         await context.Channel.SendErrorAsync(result.ErrorReason);
                     }
                     else
                     {
                         try { if (context.Message.Author.Id == Program.ApplicatonOwner.Id) await message.DeleteAsync(); }
                         catch { }
-                        Log.FormatColorWrite($"[{context.Guild?.Name}/{context.Message.Channel?.Name}] {message.Author.Username} 執行 {context.Message}", ConsoleColor.DarkYellow);
+                        Log.Info($"[{context.Guild?.Name}/{context.Message.Channel?.Name}] {message.Author.Username} 執行 {context.Message}");
                     }
                 }
             }
             else if (message.Channel is SocketTextChannel channel && message.MentionedUsers.Any((x) => x.Id == _client.CurrentUser.Id))
             {
-                var messageWithoutUser = message.CleanContent.Replace($"@{_client.CurrentUser}", "").Trim();
-                await _openAIService.HandleAIChat(channel.Guild.Id, channel, message.Author.Id, messageWithoutUser);
+                try
+                {
+                    var messageWithoutUser = message.CleanContent.Replace($"@{_client.CurrentUser}", "").Trim();
+                    await _openAIService.HandleAIChat(channel.Guild.Id, channel, message.Author.Id, messageWithoutUser);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, $"[{channel.Guild?.Name}/{channel?.Name}] {message.Author.Username} 發生錯誤");
+                    await message.Channel.SendErrorAsync(ex.Message);
+                }
             }
         }
     }
