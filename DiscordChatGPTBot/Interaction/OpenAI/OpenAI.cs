@@ -1,7 +1,6 @@
 ﻿using Discord.Interactions;
 using DiscordChatGPTBot.Auth;
 using DiscordChatGPTBot.DataBase.Table;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
@@ -26,12 +25,12 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
-        private async Task<ChannelConfig?> EnsureChannelIsActiveAndGetConfigAsync()
+        private async Task<ChannelConfig?> EnsureChannelIsActiveAndGetConfigAsync(bool sendErrorMsg = true)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
                 ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
-                if (channelConfig == null)
+                if (channelConfig == null && sendErrorMsg)
                     await Context.Interaction.SendErrorAsync("本頻道尚未啟ChatGPT聊天功能，請使用 `/active` 後再試");
 
                 return channelConfig;
@@ -110,7 +109,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 if (guildConfig == null)
                     return;
 
-                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync(false);
                 if (channelConfig != null)
                 {
                     await Context.Interaction.SendErrorAsync("本頻道已啟用\n" +
