@@ -62,11 +62,12 @@ namespace DiscordChatGPTBot.Command
                 try
                 {
                     var messageWithoutUser = message.CleanContent.Replace($"@{_client.CurrentUser}", "").Trim();
-                    await _openAIService.HandleAIChat(channel.Guild.Id, channel, message.Author.Id, messageWithoutUser);
+                    Log.Info($"[{channel.Guild?.Name}/{channel?.Name}] {message.Author.Username} 發言 `{messageWithoutUser}`");
+                    await _openAIService.HandleAIChat(channel!.Guild!.Id, channel, message.Author.Id, messageWithoutUser);
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, $"[{channel.Guild?.Name}/{channel?.Name}] {message.Author.Username} 發生錯誤");
+                    Log.Error(ex, $"[{channel.Guild?.Name}/{channel?.Name}] {message.Author.Username} 發言出現錯誤");
                     await message.Channel.SendErrorAsync(ex.Message);
                 }
             }
