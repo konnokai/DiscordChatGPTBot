@@ -84,6 +84,8 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 if (guildConfig == null)
                     return;
 
+                await DeferAsync(true);
+
                 if (await PromptUserConfirmAsync("撤銷API Key將會連同移除本伺服器的ChatGPT聊天設定，是否繼續?"))
                 {
                     db.GuildConfig.Remove(guildConfig);
