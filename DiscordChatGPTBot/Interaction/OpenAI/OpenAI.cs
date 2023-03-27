@@ -13,6 +13,30 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             _botConfig = botConfig;
         }
 
+        private async Task<GuildConfig?> EnsureGuildIsInitAndGetConfigAsync()
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
+                if (guildConfig == null)
+                    await Context.Interaction.SendErrorAsync("本伺服器未初始化，請使用 `/init` 後再試");
+
+                return guildConfig;
+            }
+        }
+
+        private async Task<ChannelConfig?> EnsureChannelIsActiveAndGetConfigAsync()
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                if (channelConfig == null)
+                    await Context.Interaction.SendErrorAsync("本頻道尚未啟ChatGPT聊天功能，請使用 `/active` 後再試");
+
+                return channelConfig;
+            }
+        }
+
         [SlashCommand("init", "初始化或更新本伺服器的OpenAI API設定")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
@@ -56,12 +80,9 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
+                var guildConfig = await EnsureGuildIsInitAndGetConfigAsync();
                 if (guildConfig == null)
-                {
-                    await Context.Interaction.SendErrorAsync("本伺服器未初始化，無法撤銷");
                     return;
-                }
 
                 if (await PromptUserConfirmAsync("撤銷API Key將會連同移除本伺服器的ChatGPT聊天設定，是否繼續?"))
                 {
@@ -84,17 +105,16 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
+                var guildConfig = await EnsureGuildIsInitAndGetConfigAsync();
                 if (guildConfig == null)
-                {
-                    await Context.Interaction.SendErrorAsync("本伺服器未初始化，請使用 `/init` 後再試");
                     return;
-                }
 
-                ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
                 if (channelConfig != null)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道已啟用");
+                    await Context.Interaction.SendErrorAsync("本頻道已啟用\n" +
+                        $"如需更改人設請使用 `/set-system-prompt`\n" +
+                        $"如需關閉請使用 `/toggle`");
                     return;
                 }
 
@@ -121,12 +141,9 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
                 if (channelConfig == null)
-                {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未啟ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
-                }
 
                 channelConfig.SystemPrompt = prompt;
                 db.ChannelConfig.Update(channelConfig);
@@ -148,12 +165,9 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
                 if (channelConfig == null)
-                {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未啟用ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
-                }
 
                 await Context.Interaction.SendConfirmAsync("本頻道的ChatGPT人設:\n" +
                     $"```\n" +
@@ -170,12 +184,9 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
                 if (channelConfig == null)
-                {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未啟用ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
-                }
 
                 channelConfig.IsEnable = !channelConfig.IsEnable;
                 db.ChannelConfig.Update(channelConfig);
@@ -194,12 +205,9 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             ChannelConfig? channelConfig;
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
+                channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
                 if (channelConfig == null)
-                {
-                    await Context.Interaction.SendErrorAsync("本頻道尚未初始化ChatGPT聊天功能，請使用 `/active` 後再試");
                     return;
-                }
 
                 if (!channelConfig.IsEnable)
                 {
@@ -209,6 +217,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
 
             await DeferAsync();
+
             try
             {
                 await _service.HandleAIChat(Context, message);
