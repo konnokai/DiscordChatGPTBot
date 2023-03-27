@@ -101,7 +101,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task Active([Summary("system-prompt", "人設，可使用 \"/set-system-prompt\" 變更")] string prompt = "你是一個有幫助的助手。")
+        public async Task Active([Summary("system-prompt", "人設，可使用 \"/set-system-prompt\" 變更")] string prompt = "你是一個有幫助的助手。使用繁體中文回答問題。")
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
