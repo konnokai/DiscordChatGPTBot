@@ -69,7 +69,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 db.SaveChanges();
                 _service.RefreshGuildConfig();
 
-                await Context.Interaction.SendConfirmAsync("已更新OpenAI API Key");
+                await Context.Interaction.SendConfirmAsync("已更新OpenAI API Key", false, true);
             }
         }
 
