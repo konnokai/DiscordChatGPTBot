@@ -94,7 +94,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                     _service.RefreshGuildConfig();
 
-                    await Context.Interaction.SendConfirmAsync("已撤銷", true);
+                    await Context.Interaction.SendConfirmAsync("已撤銷", true, true);
                 }
             }
         }
