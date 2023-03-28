@@ -120,13 +120,13 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 var permissions = Context.Guild.GetUser(_client.CurrentUser.Id).GetPermissions(channel);
                 if (!permissions.ViewChannel || !permissions.SendMessages)
                 {
-                    await Context.Interaction.SendErrorAsync($"我在 `{channel}` 沒有 `讀取&編輯頻道` 的權限，請給予權限後再次執行本指令", true);
+                    await Context.Interaction.SendErrorAsync($"我在 `{channel}` 沒有 `讀取&編輯頻道` 的權限，請給予權限後再次執行本指令");
                     return;
                 }
 
                 if (!permissions.EmbedLinks)
                 {
-                    await Context.Interaction.SendErrorAsync($"我在 `{channel}` 沒有 `嵌入連結` 的權限，請給予權限後再次執行本指令", true);
+                    await Context.Interaction.SendErrorAsync($"我在 `{channel}` 沒有 `嵌入連結` 的權限，請給予權限後再次執行本指令");
                     return;
                 }
 
