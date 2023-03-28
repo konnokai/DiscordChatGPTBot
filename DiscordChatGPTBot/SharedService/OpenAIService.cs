@@ -48,74 +48,83 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
         public async Task HandleAIChat(ulong guildId, ISocketMessageChannel channel, ulong userId, string message)
         {
-            if (_runningChannels.Contains(channel.Id))
+            try
             {
-                await channel.SendMessageAsync("還有回應尚未完成");
-                return;
-            }
-
-            _runningChannels.Add(channel.Id);
-
-            await CheckReset(guildId, channel);
-
-            var msg = await channel.SendMessageAsync("等待回應中...");
-
-            do
-            {
-                var cts = new CancellationTokenSource();
-                var cts2 = new CancellationTokenSource();
-
-                var mainTask = Task.Run(async () =>
+                if (_runningChannels.Contains(channel.Id))
                 {
-                    try
+                    await channel.SendMessageAsync("還有回應尚未完成");
+                    return;
+                }
+
+                _runningChannels.Add(channel.Id);
+
+                await CheckReset(guildId, channel);
+
+                var msg = await channel.SendMessageAsync("等待回應中...");
+
+                do
+                {
+                    var cts = new CancellationTokenSource();
+                    var cts2 = new CancellationTokenSource();
+
+                    var mainTask = Task.Run(async () =>
                     {
-                        string result = "";
-                        await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token))
+                        try
                         {
-                            result += item;
-                            if (!cts2.IsCancellationRequested) cts2.Cancel();
-
-                            result = result.Replace("\n\n", "\n");
-                            if (result.EndWithDelim())
+                            string result = "";
+                            await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token))
                             {
-                                try { await msg.ModifyAsync((act) => act.Content = result); }
-                                catch { }
+                                result += item;
+                                if (!cts2.IsCancellationRequested) cts2.Cancel();
+
+                                result = result.Replace("\n\n", "\n");
+                                if (result.EndWithDelim())
+                                {
+                                    try { await msg.ModifyAsync((act) => act.Content = result); }
+                                    catch { }
+                                }
                             }
+
+                            try { await msg.ModifyAsync((act) => act.Content = result); }
+                            catch { }
+
+                            Log.New($"回應: {result}");
                         }
+                        catch (TaskCanceledException) { }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex, "HandleAIChat");
+                        }
+                    });
 
-                        try { await msg.ModifyAsync((act) => act.Content = result); }
-                        catch { }
-
-                        Log.New($"回應: {result}");
-                    }
-                    catch (TaskCanceledException) { }
-                    catch (Exception ex)
+                    var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
+                    var completedTask = await Task.WhenAny(mainTask, waitingTask);
+                    if (completedTask == waitingTask && !waitingTask.IsCanceled)
                     {
-                        Log.Error(ex, "HandleAIChat");
+                        // 如果等待Task先完成，就取消主要的Task
+                        cts.Cancel();
+
+                        await msg.ModifyAsync((act) => act.Content = "等待訊息逾時，嘗試重新讀取中...");
+                        await Task.Delay(3000);
+                        await msg.ModifyAsync((act) => act.Content = "等待回應中...");
                     }
-                });
+                    else
+                    {
+                        break;
+                    }
 
-                var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
-                var completedTask = await Task.WhenAny(mainTask, waitingTask);
-                if (completedTask == waitingTask && !waitingTask.IsCanceled)
-                {
-                    // 如果等待Task先完成，就取消主要的Task
-                    cts.Cancel();
-
-                    await msg.ModifyAsync((act) => act.Content = "等待訊息逾時，嘗試重新讀取中...");
-                    await Task.Delay(3000);
-                    await msg.ModifyAsync((act) => act.Content = "等待回應中...");
-                }
-                else
-                {
-                    break;
-                }
-
-                await mainTask;
-            } while (true);
-
-            _runningChannels.Remove(channel.Id);
-            _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
+                    await mainTask;
+                } while (true);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+            finally
+            {
+                _runningChannels.Remove(channel.Id);
+                _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
+            }
         }
 
         public void ForceReset(ulong guildId, ulong channelId)
