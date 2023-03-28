@@ -232,7 +232,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 if (!channelConfig.IsEnable)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試", true);
                     return;
                 }
             }
