@@ -1,15 +1,18 @@
 ﻿using Discord.Interactions;
 using DiscordChatGPTBot.Auth;
 using DiscordChatGPTBot.DataBase.Table;
+using System.Threading.Channels;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
     public class OpenAI : TopLevelModule<SharedService.OpenAI.OpenAIService>
     {
+        private readonly DiscordSocketClient _client;
         private readonly BotConfig _botConfig;
 
-        public OpenAI(BotConfig botConfig)
+        public OpenAI(DiscordSocketClient client, BotConfig botConfig)
         {
+            _client = client;
             _botConfig = botConfig;
         }
 
@@ -110,6 +113,22 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 var guildConfig = await EnsureGuildIsInitAndGetConfigAsync();
                 if (guildConfig == null)
                     return;
+
+                if (Context.Channel is not IGuildChannel channel)                
+                    return;
+
+                var permissions = Context.Guild.GetUser(_client.CurrentUser.Id).GetPermissions(channel);
+                if (!permissions.ViewChannel || !permissions.SendMessages)
+                {
+                    await Context.Interaction.SendErrorAsync($"我在 `{channel}` 沒有 `讀取&編輯頻道` 的權限，請給予權限後再次執行本指令", true);
+                    return;
+                }
+
+                if (!permissions.EmbedLinks)
+                {
+                    await Context.Interaction.SendErrorAsync($"我在 `{channel}` 沒有 `嵌入連結` 的權限，請給予權限後再次執行本指令", true);
+                    return;
+                }
 
                 var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync(false);
                 if (channelConfig != null)
@@ -222,6 +241,11 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             {
                 await Context.Interaction.SendConfirmAsync($"{Context.User}: {message}");
                 await _service.HandleAIChat(Context.Guild.Id, Context.Channel, Context.User.Id, message);
+            }
+            catch (Discord.Net.HttpException httpEx) when (httpEx.DiscordCode == DiscordErrorCode.MissingPermissions)
+            {
+                Log.Warn($"{Context.Guild}/{Context.Channel} 缺少權限");
+                await Context.Interaction.SendErrorAsync($"我在 `{Context.Channel}` 沒有 `讀取&編輯頻道` 的權限，請給予權限後再次執行本指令");
             }
             catch (Exception ex)
             {
