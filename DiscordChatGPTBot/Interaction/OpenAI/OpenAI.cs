@@ -245,7 +245,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             catch (Discord.Net.HttpException httpEx) when (httpEx.DiscordCode == DiscordErrorCode.MissingPermissions)
             {
                 Log.Warn($"{Context.Guild}/{Context.Channel} 缺少權限");
-                await Context.Interaction.SendErrorAsync($"我在 `{Context.Channel}` 沒有 `讀取&編輯頻道` 的權限，請給予權限後再次執行本指令");
+                await Context.Interaction.SendErrorAsync($"我在 `{Context.Channel}` 沒有 `讀取&編輯頻道` 的權限，請給予權限後再次執行本指令", true);
             }
             catch (Exception ex)
             {
