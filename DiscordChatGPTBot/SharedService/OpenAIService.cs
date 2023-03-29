@@ -61,6 +61,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 await CheckReset(guildId, channel);
 
                 var msg = await channel.SendMessageAsync("等待回應中...");
+                bool isResponed = false;
 
                 do
                 {
@@ -89,6 +90,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             catch { }
 
                             Log.New($"回應: {result}");
+                            isResponed = true;
                         }
                         catch (TaskCanceledException) { }
                         catch (Exception ex)
@@ -108,13 +110,9 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         await Task.Delay(3000);
                         await msg.ModifyAsync((act) => act.Content = "等待回應中...");
                     }
-                    else
-                    {
-                        break;
-                    }
 
                     await mainTask;
-                } while (true);
+                } while (!isResponed);
 
                 _runningChannels.Remove(channel.Id);
                 _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
