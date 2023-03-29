@@ -115,15 +115,15 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
                     await mainTask;
                 } while (true);
+
+                _runningChannels.Remove(channel.Id);
+                _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
             }
             catch (Exception)
             {
-                throw;
-            }
-            finally
-            {
                 _runningChannels.Remove(channel.Id);
                 _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
+                throw;
             }
         }
 
