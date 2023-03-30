@@ -169,10 +169,10 @@ namespace DiscordChatGPTBot
                     try
                     {
                         var result = await interactionService.RegisterCommandsToGuildAsync(botConfig.TestSlashCommandGuildId);
-                        Log.Info($"已註冊指令 ({botConfig.TestSlashCommandGuildId}) : {string.Join(", ", result.Select((x) => x.Name))}");
+                        Log.Info($"已註冊指令 ({botConfig.TestSlashCommandGuildId}): {string.Join(", ", result.Select((x) => x.Name))}");
 
                         result = await interactionService.AddModulesToGuildAsync(botConfig.TestSlashCommandGuildId, false, interactionService.Modules.Where((x) => x.DontAutoRegister).ToArray());
-                        Log.Info($"已註冊指令 ({botConfig.TestSlashCommandGuildId}) : {string.Join(", ", result.Select((x) => x.Name))}");
+                        Log.Info($"已註冊指令 ({botConfig.TestSlashCommandGuildId}): {string.Join(", ", result.Select((x) => x.Name))}");
                     }
                     catch (Exception ex)
                     {
@@ -193,7 +193,7 @@ namespace DiscordChatGPTBot
                         if (botConfig.TestSlashCommandGuildId != 0 && _client.GetGuild(botConfig.TestSlashCommandGuildId) != null)
                         {
                             var result = await interactionService.RemoveModulesFromGuildAsync(botConfig.TestSlashCommandGuildId, interactionService.Modules.Where((x) => !x.DontAutoRegister).ToArray());
-                            Log.Info($"已移除指令 ({botConfig.TestSlashCommandGuildId}) : {string.Join(", ", result.Select((x) => x.Name))}");
+                            Log.Info($"({botConfig.TestSlashCommandGuildId}) 已移除測試指令，剩餘指令: {string.Join(", ", result.Select((x) => x.Name))}");
                         }
 
                         if (commandCount != iService.GetService<InteractionHandler>().CommandCount)
