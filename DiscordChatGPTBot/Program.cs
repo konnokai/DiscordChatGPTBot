@@ -190,6 +190,12 @@ namespace DiscordChatGPTBot
                         if (File.Exists(GetDataFilePath("CommandCount.bin")))
                             commandCount = BitConverter.ToInt32(File.ReadAllBytes(GetDataFilePath("CommandCount.bin")));
 
+                        if (botConfig.TestSlashCommandGuildId != 0 && _client.GetGuild(botConfig.TestSlashCommandGuildId) != null)
+                        {
+                            var result = await interactionService.RemoveModulesFromGuildAsync(botConfig.TestSlashCommandGuildId, interactionService.Modules.Where((x) => !x.DontAutoRegister).ToArray());
+                            Log.Info($"已移除指令 ({botConfig.TestSlashCommandGuildId}) : {string.Join(", ", result.Select((x) => x.Name))}");
+                        }
+
                         if (commandCount != iService.GetService<InteractionHandler>().CommandCount)
                         {
                             try
