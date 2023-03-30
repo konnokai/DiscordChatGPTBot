@@ -133,6 +133,15 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
                     await mainTask;
                 } while (!isResponed);
+
+                IEmote? iEmote = null;
+                if (Emote.TryParse(_channelConfigs.Single((x) => x.ChannelId == channel.Id).CompletedEmoji, out var emote))
+                    iEmote = emote;
+                else if (Emoji.TryParse(_channelConfigs.Single((x) => x.ChannelId == channel.Id).CompletedEmoji, out var emoji))
+                    iEmote = emoji;
+
+                if (iEmote != null)
+                    await msg.AddReactionAsync(iEmote, new RequestOptions() { RetryMode = RetryMode.AlwaysRetry });
             }
             catch (Exception)
             {
@@ -178,9 +187,17 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             if (!_guildOpenAIKey.TryGetValue(guildId, out string? apiKey))
                 throw new InvalidOperationException("APIKey未設置");
 
-            string desKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
-            if (string.IsNullOrEmpty(desKey) || desKey.Length != 51)
+            string desKey;
+            try
+            {
+                desKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
+                if (string.IsNullOrEmpty(desKey) || desKey.Length != 51)
+                    throw new InvalidOperationException("APIKey解密失敗");
+            }
+            catch
+            {
                 throw new InvalidOperationException("APIKey解密失敗");
+            }           
 
             OpenAIClient _openAIClient = new OpenAIClient(desKey);
 

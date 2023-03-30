@@ -135,6 +135,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 {
                     await Context.Interaction.SendErrorAsync("本頻道已啟用\n" +
                         $"如需更改人設請使用 `/set-system-prompt`\n" +
+                        $"如需更改完成表情請使用 `/set-complete-emote`\n" +
                         $"如需切換開關請使用 `/toggle`");
                     return;
                 }
@@ -146,6 +147,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 await Context.Interaction.SendConfirmAsync($"已在此頻道啟用ChatGPT對話功能\n" +
                     $"如需更改人設請使用 `/set-system-prompt`\n" +
+                    $"如需更改完成表情請使用 `/set-complete-emote`\n" +
                     $"如需切換開關請使用 `/toggle`\n" +
                     $"ChatGPT人設:\n" +
                     $"```\n" +
@@ -174,6 +176,49 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                     $"```\n" +
                     $"{prompt}\n" +
                     $"```");
+
+                _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
+                _service.RefreshChannelConfig();
+            }
+        }
+
+        [SlashCommand("set-complete-emote", "設定回應完成時的表情")]
+        [RequireContext(ContextType.Guild)]
+        [DefaultMemberPermissions(GuildPermission.Administrator)]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task SetCompletedEmote([Summary("emote", "表情，可使用本伺服器表情或Disord內建表情")] string emoteName)
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
+                if (channelConfig == null)
+                    return;
+
+                emoteName = emoteName.Trim();
+                IEmote? emote = null;
+                if (Emoji.TryParse(emoteName, out var result))
+                    emote = result;
+                else if (Emote.TryParse(emoteName, out var result1))
+                {
+                    if (!Context.Guild.Emotes.Any((x) => x.Id == result1.Id))
+                    {
+                        await Context.Interaction.SendErrorAsync("僅可新增本伺服器的表情");
+                        return;
+                    }
+                    emote = result1;
+                }
+
+                if (emote == null)
+                {
+                    await Context.Interaction.SendErrorAsync("表情辨識失敗，僅可使用一個表情");
+                    return;
+                }
+
+                channelConfig.CompletedEmoji = emote.ToString()!;
+                db.ChannelConfig.Update(channelConfig);
+                db.SaveChanges();
+
+                await Context.Interaction.SendConfirmAsync($"已更新回應完成時的表情: {emote}");
 
                 _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
                 _service.RefreshChannelConfig();
