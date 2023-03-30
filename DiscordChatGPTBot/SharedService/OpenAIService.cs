@@ -5,6 +5,7 @@ using OpenAI.Chat;
 using OpenAI.Models;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 
 namespace DiscordChatGPTBot.SharedService.OpenAI
 {
@@ -93,9 +94,28 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             isResponed = true;
                         }
                         catch (TaskCanceledException) { }
+                        catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                        {
+                            // Create by ChatGPT
+                            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
+                            var match = regex.Match(httpEx.Message);
+                            string message = "已達到ChatGPT請求上限，請稍後再試";
+                            if (match.Success)
+                                message += $"\nChatGPT回傳訊息:\n" +
+                                    $"```\n" +
+                                    $"{match.Groups[1].Value}\n" +
+                                    $"```";
+
+                            await msg.ModifyAsync((act) => act.Content = message);
+                            Log.Error("HandleAIChat-429 Error");
+                            Log.Error(message);
+                            isResponed = true;
+                        }
                         catch (Exception ex)
                         {
+                            await msg.ModifyAsync((act) => act.Content = "出現錯誤，請向Bot擁有者確認");
                             Log.Error(ex, "HandleAIChat");
+                            isResponed = true;
                         }
                     });
 
