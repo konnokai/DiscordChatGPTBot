@@ -133,15 +133,18 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
                     await mainTask;
                 } while (!isResponed);
-
-                _runningChannels.Remove(channel.Id);
-                _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
             }
             catch (Exception)
             {
-                _runningChannels.Remove(channel.Id);
-                _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => turn++);
                 throw;
+            }
+            // ChatGPT: 不管是否有發生例外，finally 區塊中的程式碼都會被執行，包括在catch區塊中使用throw語句重新拋出異常的情況下。
+            // 這是因為finally區塊是在 try-catch 區塊之後、最後執行的一個區塊，無論有沒有出現異常，都需要執行 finally 區塊以保證相關資源的正確釋放。 
+            finally
+            {
+                _runningChannels.Remove(channel.Id);
+                // ChatGPT: 使用 turn++ 會先返回當前值，再將其遞增，這意味著你每次使用 AddOrUpdate 時，都在嘗試對相同的值進行更新，因此沒有實際的更新發生。
+                _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => (ushort)(turn + 1));
             }
         }
 
