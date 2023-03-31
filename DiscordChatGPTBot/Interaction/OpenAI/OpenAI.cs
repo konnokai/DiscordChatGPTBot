@@ -6,6 +6,14 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 {
     public class OpenAI : TopLevelModule<SharedService.OpenAI.OpenAIService>
     {
+        public enum ToggleSetting
+        {
+            [ChoiceDisplay("聊天開關")]
+            Enable,
+            [ChoiceDisplay("重置紀錄時繼承最後的聊天")]
+            InheritChatWhenReset
+        }
+
         private readonly DiscordSocketClient _client;
         private readonly BotConfig _botConfig;
 
@@ -113,7 +121,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 if (guildConfig == null)
                     return;
 
-                if (Context.Channel is not IGuildChannel channel)                
+                if (Context.Channel is not IGuildChannel channel)
                     return;
 
                 var permissions = Context.Guild.GetUser(_client.CurrentUser.Id).GetPermissions(channel);
@@ -241,11 +249,11 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
-        [SlashCommand("toggle", "切換開關")]
+        [SlashCommand("toggle", "切換開關設定")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task Toggle()
+        public async Task Toggle([Summary("setting", "設定")] ToggleSetting toggleSetting)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
@@ -253,11 +261,21 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 if (channelConfig == null)
                     return;
 
-                channelConfig.IsEnable = !channelConfig.IsEnable;
+                switch (toggleSetting)
+                {
+                    case ToggleSetting.Enable:
+                        channelConfig.IsEnable = !channelConfig.IsEnable;
+                        break;
+                    case ToggleSetting.InheritChatWhenReset:
+                        channelConfig.IsInheritChatWhenReset = !channelConfig.IsInheritChatWhenReset;
+                        break;
+                }
+
                 db.ChannelConfig.Update(channelConfig);
                 db.SaveChanges();
 
-                await Context.Interaction.SendConfirmAsync("已切換ChatGPT聊天功能為: " + (channelConfig.IsEnable ? "開啟" : "關閉"));
+                await Context.Interaction.SendConfirmAsync("設定ChatGPT聊天功能為: " + (channelConfig.IsEnable ? "開啟" : "關閉") +
+                    "\n當重置時繼承最後三次的對話: " + (channelConfig.IsInheritChatWhenReset ? "開啟" : "關閉"));
                 _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
                 _service.RefreshChannelConfig();
             }

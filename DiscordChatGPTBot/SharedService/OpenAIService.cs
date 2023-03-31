@@ -180,9 +180,21 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
             if (isTurnsMax || isNeedResetTime)
             {
-                _chatPrompt.TryRemove($"{channel.Id}", out var _);
                 _lastSendMessageTimestamp.AddOrUpdate(channel.Id, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
-                await channel.SendMessageAsync("已重置歷史訊息");
+
+                if (channelConfig.IsInheritChatWhenReset)
+                {
+                    var tempChatPrompt = GetOrAddChatPrompt(channel.Id).TakeLast(6).Where((x) => x.Role != "system");
+                    _chatPrompt.TryRemove($"{channel.Id}", out var _);
+                    var chatPrompts = GetOrAddChatPrompt(channel.Id);
+                    chatPrompts.AddRange(tempChatPrompt);
+                    await channel.SendMessageAsync("已重置並繼承歷史訊息");
+                }
+                else
+                {
+                    _chatPrompt.TryRemove($"{channel.Id}", out var _);
+                    await channel.SendMessageAsync("已重置歷史訊息");
+                }
             }
         }
 
