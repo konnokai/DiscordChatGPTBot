@@ -169,13 +169,13 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.GuildId == guildId && x.ChannelId == channel.Id) ?? throw new InvalidOperationException("資料庫無此頻道的資料");
             if (!channelConfig.IsEnable) throw new InvalidOperationException("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試");
 
-            var promptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x.Role.ToLower() == "assistant");
-            bool isTurnsMax = promptCount >= channelConfig.MaxTurns;
+            var assistantPromptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x.Role.ToLower() == "assistant");
+            bool isTurnsMax = assistantPromptCount >= channelConfig.MaxTurns;
 
             var dateTime = _lastSendMessageTimestamp.GetOrAdd(channel.Id, DateTime.Now);
             bool isNeedResetTime = DateTime.Now.Subtract(dateTime).TotalSeconds > channelConfig.ResetDeltaTime;
 
-            if (promptCount > 0) Log.Debug($"{channel.Id} ({dateTime}): {promptCount}");
+            if (assistantPromptCount > 0) Log.Debug($"{channel.Id} ({dateTime}): {assistantPromptCount}");
             else Log.Debug($"{channel.Id} ({dateTime}): First Turn");
 
             if (isTurnsMax || isNeedResetTime)
