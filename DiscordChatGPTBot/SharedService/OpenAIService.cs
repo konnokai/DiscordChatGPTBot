@@ -13,7 +13,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
     {
         private readonly ConcurrentDictionary<string, List<ChatPrompt>> _chatPrompt = new();
         private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
-        private readonly ConcurrentDictionary<ulong, ushort> _turns = new();
         private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
         private readonly List<DataBase.Table.ChannelConfig> _channelConfigs = new();
         private readonly HashSet<ulong> _runningChannels = new();
@@ -46,6 +45,9 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 }
             }
         }
+
+        public bool IsRunningAIChat(ulong channelId)
+            => _runningChannels.Contains(channelId);
 
         public async Task HandleAIChat(ulong guildId, ISocketMessageChannel channel, ulong userId, string message)
         {
@@ -152,8 +154,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             finally
             {
                 _runningChannels.Remove(channel.Id);
-                // ChatGPT: 使用 turn++ 會先返回當前值，再將其遞增，這意味著你每次使用 AddOrUpdate 時，都在嘗試對相同的值進行更新，因此沒有實際的更新發生。
-                _turns.AddOrUpdate(channel.Id, 1, (channelId, turn) => (ushort)(turn + 1));
             }
         }
 
@@ -162,7 +162,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             _runningChannels.Remove(channelId);
             _lastSendMessageTimestamp.AddOrUpdate(channelId, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
             _chatPrompt.TryRemove($"{channelId}", out var _);
-            _turns.TryRemove(channelId, out var _);
         }
 
         private async Task CheckReset(ulong guildId, ISocketMessageChannel channel)
@@ -174,7 +173,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             bool isTurnsMax = promptCount >= channelConfig.MaxTurns;
 
             var dateTime = _lastSendMessageTimestamp.GetOrAdd(channel.Id, DateTime.Now);
-            bool isTurnsMax = _turns.ContainsKey(channel.Id) && _turns[channel.Id]++ >= channelConfig.MaxTurns;
             bool isNeedResetTime = DateTime.Now.Subtract(dateTime).TotalSeconds > channelConfig.ResetDeltaTime;
 
             if (promptCount > 0) Log.Debug($"{channel.Id} ({dateTime}): {promptCount}");
@@ -183,7 +181,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             if (isTurnsMax || isNeedResetTime)
             {
                 _chatPrompt.TryRemove($"{channel.Id}", out var _);
-                _turns.TryRemove(channel.Id, out var _);
                 _lastSendMessageTimestamp.AddOrUpdate(channel.Id, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
                 await channel.SendMessageAsync("已重置歷史訊息");
             }
@@ -204,7 +201,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             catch
             {
                 throw new InvalidOperationException("APIKey解密失敗");
-            }           
+            }
 
             OpenAIClient _openAIClient = new OpenAIClient(desKey);
 

@@ -1,7 +1,6 @@
 ﻿using Discord.Interactions;
 using DiscordChatGPTBot.Auth;
 using DiscordChatGPTBot.DataBase.Table;
-using System.Threading.Channels;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
@@ -303,6 +302,12 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         public async Task Reset()
         {
+            if (_service.IsRunningAIChat(Context.Channel.Id))
+            {
+                await Context.Interaction.SendErrorAsync("還有回應尚未完成");
+                return;
+            }
+
             _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
             _service.RefreshChannelConfig();
             await Context.Interaction.SendConfirmAsync("已重置歷史訊息");
