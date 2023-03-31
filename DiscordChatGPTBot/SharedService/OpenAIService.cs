@@ -79,7 +79,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                                 result += item;
                                 if (!cts2.IsCancellationRequested) cts2.Cancel();
 
-                                result = result.Replace("\n\n", "\n");
+                                result = result.Replace("\n\n", "\n").Replace("||", "\\|\\|");
                                 if (result.EndWithDelim())
                                 {
                                     try { await msg.ModifyAsync((act) => act.Content = result); }
