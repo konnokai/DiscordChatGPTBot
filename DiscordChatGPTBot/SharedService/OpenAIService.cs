@@ -260,7 +260,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
     static class Ext
     {
-        private static readonly string[] Delims = new string[] { "\n", ",", ".", "，", "。", "、", "：", "（", "）", "「", "」" };
+        private static readonly string[] Delims = new string[] { "\n", ",", ".", "，", "。", "、", "：", "）", "」" };
 
         public static void AddChat(this List<ChatPrompt> chatPrompts, string role, string chat)
         {
