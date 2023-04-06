@@ -159,8 +159,16 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 else if (Emoji.TryParse(_channelConfigs.Single((x) => x.ChannelId == channel.Id).CompletedEmoji, out var emoji))
                     iEmote = emoji;
 
-                if (iEmote != null)
-                    await msg.AddReactionAsync(iEmote, new RequestOptions() { RetryMode = RetryMode.AlwaysRetry });
+                try
+                {
+                    if (iEmote != null)
+                        await msg.AddReactionAsync(iEmote, new RequestOptions() { RetryMode = RetryMode.AlwaysRetry });
+                }
+                catch (Discord.Net.HttpException httpEx) when (httpEx.DiscordCode == DiscordErrorCode.UnknownEmoji)
+                {
+                    await channel.SendMessageAsync("完成表情遺失，請使用 `/set-complete-emote` 重新設定");
+                    await msg.AddReactionAsync(Emoji.Parse(":ok:"), new RequestOptions() { RetryMode = RetryMode.AlwaysRetry });
+                }
             }
             catch (Exception)
             {
