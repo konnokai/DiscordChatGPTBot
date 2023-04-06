@@ -113,6 +113,23 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             Log.Error(message);
                             isResponed = true;
                         }
+                        catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                        {
+                            // Create by ChatGPT
+                            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
+                            var match = regex.Match(httpEx.Message);
+                            string message = "錯誤的請求，可能是已達到ChatGPT的Token上限，請嘗試 `/reset` 後重新發言";
+                            if (match.Success)
+                                message += $"\nChatGPT回傳訊息:\n" +
+                                    $"```\n" +
+                                    $"{match.Groups[1].Value}\n" +
+                                    $"```";
+
+                            await msg.ModifyAsync((act) => act.Content = message);
+                            Log.Error("HandleAIChat-400 Error");
+                            Log.Error(message);
+                            isResponed = true;
+                        }
                         catch (Exception ex)
                         {
                             await msg.ModifyAsync((act) => act.Content = "出現錯誤，請向Bot擁有者確認");
