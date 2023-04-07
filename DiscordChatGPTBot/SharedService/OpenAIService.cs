@@ -245,7 +245,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             var chatPrompts = GetOrAddChatPrompt(channelId);
             chatPrompts.AddChat("user", chat);
 
-            var chatRequest = new ChatRequest(chatPrompts, Model.GPT3_5_Turbo);
+            var chatRequest = new ChatRequest(chatPrompts, Model.GPT3_5_Turbo, user: $"{guildId}-{channelId}-{userId}");
             string completionMessage = "";
             string role = "";
 
