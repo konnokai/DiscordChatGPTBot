@@ -130,9 +130,12 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             Log.Error(message);
                             isResponed = true;
                         }
+                        catch (IOException ioEx) when (ioEx.Message.Contains("The response ended prematurely")) { }
                         catch (Exception ex)
                         {
-                            await msg.ModifyAsync((act) => act.Content = "出現錯誤，請向Bot擁有者確認");
+                            await msg.ModifyAsync((act) =>
+                            act.Content = $"出現錯誤，請向Bot擁有者確認\n" +
+                                          $"{ex.Message}");
                             Log.Error(ex, "HandleAIChat");
                             isResponed = true;
                         }
