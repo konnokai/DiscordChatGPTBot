@@ -120,7 +120,7 @@ public static class Log
         WriteLogToFile(LogType.Verb, message.Message);
 #endif
 
-        if (message.Exception != null && message.Exception is not Discord.WebSocket.GatewayReconnectException)
+        if (message.Exception != null && message.Exception is not GatewayReconnectException && !message.Exception.Message.Contains("WebSocket connection was closed"))
         {
             consoleColor = ConsoleColor.DarkRed;
             FormatColorWrite(message.Exception.GetType().FullName, consoleColor);

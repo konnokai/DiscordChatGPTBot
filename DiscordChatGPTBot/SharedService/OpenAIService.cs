@@ -82,7 +82,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                                 result += item;
                                 if (!cts2.IsCancellationRequested) cts2.Cancel();
 
-                                result = result.Replace("\n\n", "\n").Replace("||", "\\|\\|");
+                                result = result.Replace("\n\n", "\n").Replace("||", "\\|\\|").Replace("\\", "\\\\");
                                 if (result.EndWithDelim() || wordCount >= 100)
                                 {
                                     wordCount = 0;
