@@ -63,7 +63,7 @@ namespace DiscordChatGPTBot.Command
                 {
                     var messageWithoutUser = message.Content.Replace("<@!", "<@").Replace($"<@{_client.CurrentUser.Id}>", "").Trim();
                     if (string.IsNullOrEmpty(messageWithoutUser))
-                        return;                    
+                        return;
 
                     Log.Info($"[{channel.Guild?.Name}/{channel?.Name}] {message.Author.Username}: {messageWithoutUser}");
                     await _openAIService.HandleAIChat(channel!.Guild!.Id, channel, message.Author.Id, messageWithoutUser);
