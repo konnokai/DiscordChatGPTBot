@@ -11,7 +11,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 {
     public class OpenAIService : IInteractionService
     {
-        private readonly ConcurrentDictionary<string, List<ChatPrompt>> _chatPrompt = new();
+        private readonly ConcurrentDictionary<string, List<Message>> _chatPrompt = new();
         private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
         private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
         private readonly List<DataBase.Table.ChannelConfig> _channelConfigs = new();
@@ -199,7 +199,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.GuildId == guildId && x.ChannelId == channel.Id) ?? throw new InvalidOperationException("資料庫無此頻道的資料");
             if (!channelConfig.IsEnable) throw new InvalidOperationException("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試");
 
-            var assistantPromptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x.Role.ToLower() == "assistant");
+            var assistantPromptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x.Role == Role.Assistant);
             bool isTurnsMax = assistantPromptCount >= channelConfig.MaxTurns;
 
             var dateTime = _lastSendMessageTimestamp.GetOrAdd(channel.Id, DateTime.Now);
@@ -214,7 +214,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
                 if (channelConfig.IsInheritChatWhenReset)
                 {
-                    var tempChatPrompt = GetOrAddChatPrompt(channel.Id).TakeLast(6).Where((x) => x.Role != "system");
+                    var tempChatPrompt = GetOrAddChatPrompt(channel.Id).TakeLast(6).Where((x) => x.Role != Role.System);
                     _chatPrompt.TryRemove($"{channel.Id}", out var _);
                     var chatPrompts = GetOrAddChatPrompt(channel.Id);
                     chatPrompts.AddRange(tempChatPrompt);
@@ -248,24 +248,20 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             OpenAIClient _openAIClient = new OpenAIClient(desKey);
 
             var chatPrompts = GetOrAddChatPrompt(channelId);
-            chatPrompts.AddChat("user", chat);
+            chatPrompts.AddChat(Role.User, chat);
 
             var chatRequest = new ChatRequest(chatPrompts, Model.GPT3_5_Turbo, user: $"{guildId}-{channelId}-{userId}");
             string completionMessage = "";
-            string role = "";
 
             await foreach (var result in _openAIClient.ChatEndpoint.StreamCompletionEnumerableAsync(chatRequest, cancellationToken))
             {
-                Log.Debug(result.ToString());
+                Log.Debug(JsonConvert.SerializeObject(result));
 
                 if (result?.FirstChoice?.FinishReason != null && result?.FirstChoice?.FinishReason == "stop")
                     break;
 
                 if (result?.FirstChoice?.Delta == null)
                     continue;
-
-                if (result.FirstChoice.Delta.Role != null)
-                    role = result.FirstChoice.Delta.Role;
 
                 if (result.FirstChoice.Delta.Content != null)
                 {
@@ -278,7 +274,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 // result.Usage.TotalTokens
             }
 
-            chatPrompts.AddChat(role, completionMessage);
+            chatPrompts.AddChat(Role.Assistant, completionMessage);
             _lastSendMessageTimestamp.AddOrUpdate(channelId, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
 
             using (var db = DataBase.MainDbContext.GetDbContext())
@@ -288,12 +284,12 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             }
         }
 
-        private List<ChatPrompt> GetOrAddChatPrompt(ulong channelId)
+        private List<Message> GetOrAddChatPrompt(ulong channelId)
         {
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.ChannelId == channelId);
             return channelConfig == null
                 ? throw new InvalidOperationException("資料庫無此頻道的資料")
-                : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<ChatPrompt>() { new ChatPrompt("system", channelConfig.SystemPrompt) });
+                : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<Message>() { new Message( Role.System, channelConfig.SystemPrompt) });
         }
     }
 
@@ -301,9 +297,9 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
     {
         private static readonly string[] Delims = new string[] { "\n", ",", ".", "，", "。", "、", "：", "）", "」", "}", "]" };
 
-        public static void AddChat(this List<ChatPrompt> chatPrompts, string role, string chat)
+        public static void AddChat(this List<Message> chatPrompts, Role role, string chat)
         {
-            chatPrompts.Add(new ChatPrompt(role, chat));
+            chatPrompts.Add(new Message(role, chat));
         }
 
         public static bool EndWithDelim(this string context)

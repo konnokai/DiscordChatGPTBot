@@ -21,7 +21,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="OpenAI-DotNet" Version="6.5.3" />
+    <PackageReference Include="OpenAI-DotNet" Version="6.8.1" />
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.4" />
     <PackageReference Include="StackExchange.Redis" Version="2.6.96" />
   </ItemGroup>

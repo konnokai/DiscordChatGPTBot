@@ -106,7 +106,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                     await Context.Interaction.SendConfirmAsync("已撤銷", true, true);
                 }
-            }            
+            }
         }
 
         [SlashCommand("active", "在此頻道啟用ChatGPT聊天功能")]
