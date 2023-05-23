@@ -132,7 +132,22 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             Log.Error(message);
                             isResponed = true;
                         }
-                        catch (IOException ioEx) when (ioEx.Message.Contains("The response ended prematurely")) { }
+                        catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.InternalServerError)
+                        {
+                            // Create by ChatGPT
+                            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
+                            var match = regex.Match(httpEx.Message);
+                            string message = "ChatGPT伺服器出現問題，請稍後再試";
+                            if (match.Success)
+                                message += $"\nChatGPT回傳訊息:\n" +
+                                    $"```\n" +
+                                    $"{match.Groups[1].Value}\n" +
+                                    $"```";
+
+                            await msg.ModifyAsync((act) => act.Content = message);
+                            isResponed = true;
+                        }
+                        catch (IOException ioEx) when (ioEx.Message.Contains("The response ended prematurely")) { } // 忘記這是幹嘛的
                         catch (Exception ex)
                         {
                             await msg.ModifyAsync((act) =>
