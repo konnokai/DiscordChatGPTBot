@@ -6,7 +6,6 @@ using OpenAI.Models;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using static System.Net.WebRequestMethods;
 
 namespace DiscordChatGPTBot.SharedService.OpenAI
 {
@@ -104,7 +103,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             string message = GetOpenAIErrorMessage("已達到ChatGPT請求上限，請稍後再試", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             Log.Error("HandleAIChat-429 Error");
-                            Log.Error(message);
                             isResponed = true;
                         }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
@@ -119,6 +117,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         {
                             string message = GetOpenAIErrorMessage("ChatGPT伺服器出現問題，請稍後再試", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
+                            Log.Error("HandleAIChat-500 Error");
                             isResponed = true;
                         }
                         catch (IOException ioEx) when (ioEx.Message.Contains("The response ended prematurely")) { } // 忘記這是幹嘛的
@@ -126,7 +125,9 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         {
                             await msg.ModifyAsync((act) =>
                             act.Content = $"出現錯誤，請向Bot擁有者確認\n" +
-                                          $"{ex.Message}");
+                                          $"```\n" +
+                                          $"{ex.Message}\n" +
+                                          $"```");
                             Log.Error(ex, "HandleAIChat");
                             isResponed = true;
                         }
