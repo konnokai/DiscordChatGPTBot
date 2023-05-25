@@ -6,6 +6,7 @@ using OpenAI.Models;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using static System.Net.WebRequestMethods;
 
 namespace DiscordChatGPTBot.SharedService.OpenAI
 {
@@ -100,16 +101,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         catch (TaskCanceledException) { }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                         {
-                            // Create by ChatGPT
-                            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
-                            var match = regex.Match(httpEx.Message);
-                            string message = "已達到ChatGPT請求上限，請稍後再試";
-                            if (match.Success)
-                                message += $"\nChatGPT回傳訊息:\n" +
-                                    $"```\n" +
-                                    $"{match.Groups[1].Value}\n" +
-                                    $"```";
-
+                            string message = GetOpenAIErrorMessage("已達到ChatGPT請求上限，請稍後再試", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             Log.Error("HandleAIChat-429 Error");
                             Log.Error(message);
@@ -117,16 +109,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
                         {
-                            // Create by ChatGPT
-                            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
-                            var match = regex.Match(httpEx.Message);
-                            string message = "錯誤的請求，可能是已達到ChatGPT的Token上限，請嘗試 `/reset` 後重新發言";
-                            if (match.Success)
-                                message += $"\nChatGPT回傳訊息:\n" +
-                                    $"```\n" +
-                                    $"{match.Groups[1].Value}\n" +
-                                    $"```";
-
+                            string message = GetOpenAIErrorMessage("錯誤的請求，可能是已達到ChatGPT的Token上限，請嘗試 `/reset` 後重新發言", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             Log.Error("HandleAIChat-400 Error");
                             Log.Error(message);
@@ -134,16 +117,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.InternalServerError)
                         {
-                            // Create by ChatGPT
-                            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
-                            var match = regex.Match(httpEx.Message);
-                            string message = "ChatGPT伺服器出現問題，請稍後再試";
-                            if (match.Success)
-                                message += $"\nChatGPT回傳訊息:\n" +
-                                    $"```\n" +
-                                    $"{match.Groups[1].Value}\n" +
-                                    $"```";
-
+                            string message = GetOpenAIErrorMessage("ChatGPT伺服器出現問題，請稍後再試", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             isResponed = true;
                         }
@@ -207,6 +181,20 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             _runningChannels.Remove(channelId);
             _lastSendMessageTimestamp.AddOrUpdate(channelId, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
             _chatPrompt.TryRemove($"{channelId}", out var _);
+        }
+
+        private string GetOpenAIErrorMessage(string message, string errorMessage)
+        {
+            // Create by ChatGPT
+            Regex regex = new Regex(@"""message"":\s*""(.*?)""");
+            var match = regex.Match(errorMessage);
+            if (match.Success)
+                message += $"\nChatGPT回傳訊息:\n" +
+                    $"```\n" +
+                    $"{match.Groups[1].Value}\n" +
+                    $"```";
+
+            return message;
         }
 
         private async Task CheckReset(ulong guildId, ISocketMessageChannel channel)
@@ -304,7 +292,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.ChannelId == channelId);
             return channelConfig == null
                 ? throw new InvalidOperationException("資料庫無此頻道的資料")
-                : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<Message>() { new Message( Role.System, channelConfig.SystemPrompt) });
+                : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<Message>() { new Message(Role.System, channelConfig.SystemPrompt) });
         }
     }
 
