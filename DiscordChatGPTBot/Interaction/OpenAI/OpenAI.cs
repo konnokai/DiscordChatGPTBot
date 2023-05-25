@@ -4,6 +4,7 @@ using DiscordChatGPTBot.DataBase.Table;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
+    [EnabledInDm(false)]
     public class OpenAI : TopLevelModule<SharedService.OpenAI.OpenAIService>
     {
         public enum ToggleSetting
