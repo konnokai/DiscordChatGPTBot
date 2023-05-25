@@ -317,6 +317,22 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
+        [SlashCommand("stop", "停止對話")]
+        [RequireContext(ContextType.Guild)]
+        public async Task Stop()
+        {
+            if (!_service.IsRunningAIChat(Context.Channel.Id))
+            {
+                await Context.Interaction.SendErrorAsync("目前沒有正在回應的訊息");
+                return;
+            }
+
+            if (_service.StopChat(Context.Channel.Id))
+                await Context.Interaction.SendConfirmAsync("已取消");
+            else
+                await Context.Interaction.SendErrorAsync("無法取消");
+        }
+
         [SlashCommand("reset", "重置對話紀錄")]
         [RequireContext(ContextType.Guild)]
         public async Task Reset()

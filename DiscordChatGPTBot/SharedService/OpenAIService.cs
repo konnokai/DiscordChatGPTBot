@@ -14,6 +14,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
         private readonly ConcurrentDictionary<string, List<Message>> _chatPrompt = new();
         private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
         private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
+        private readonly ConcurrentDictionary<ulong, CancellationTokenSource> _cancellationTokenSource = new();
         private readonly List<DataBase.Table.ChannelConfig> _channelConfigs = new();
         private readonly HashSet<ulong> _runningChannels = new();
         private readonly BotConfig _botConfig;
@@ -49,6 +50,17 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
         public bool IsRunningAIChat(ulong channelId)
             => _runningChannels.Contains(channelId);
 
+        public bool StopChat(ulong channelId)
+        {
+            if (_cancellationTokenSource.TryRemove(channelId, out var cancellationTokenSource))
+            {
+                cancellationTokenSource.Cancel();
+                return true;
+            }
+
+            return false;
+        }
+
         public async Task HandleAIChat(ulong guildId, ISocketMessageChannel channel, ulong userId, string message)
         {
             try
@@ -68,14 +80,17 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
                 do
                 {
-                    var cts = new CancellationTokenSource();
+                    var cts = _cancellationTokenSource.AddOrUpdate(channel.Id, (channeId) => { return new CancellationTokenSource(); }, (channelId, oldCts) => { return new CancellationTokenSource(); });
                     var cts2 = new CancellationTokenSource();
+                    string result = "";
+
+                    var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
 
                     var mainTask = Task.Run(async () =>
                     {
                         try
                         {
-                            string result = ""; int wordCount = 0;
+                            int wordCount = 0;
                             await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token))
                             {
                                 wordCount++;
@@ -98,6 +113,13 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             isResponed = true;
                         }
                         catch (TaskCanceledException) { }
+                        catch (OperationCanceledException) when (waitingTask.IsCanceled)
+                        {
+                            try { await msg.ModifyAsync((act) => act.Content = result); }
+                            catch { }
+                            Log.New($"回應: {result}");
+                            isResponed = true;
+                        }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                         {
                             string message = GetOpenAIErrorMessage("已達到ChatGPT請求上限，請稍後再試", httpEx.Message);
@@ -133,7 +155,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         }
                     });
 
-                    var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
                     var completedTask = await Task.WhenAny(mainTask, waitingTask);
                     if (completedTask == waitingTask && !waitingTask.IsCanceled)
                     {
@@ -164,6 +185,8 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                     await channel.SendMessageAsync("完成表情遺失，請使用 `/set-complete-emote` 重新設定");
                     await msg.AddReactionAsync(Emoji.Parse(":ok:"), new RequestOptions() { RetryMode = RetryMode.AlwaysRetry });
                 }
+
+                _cancellationTokenSource.TryRemove(channel.Id, out var _);
             }
             catch (Exception)
             {
