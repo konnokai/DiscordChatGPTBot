@@ -5,3 +5,4 @@ services:
     volumes:
       - ./Data:/app/Data
       - ./bot_config.json:/app/bot_config.json
+    restart: unless-stopped
