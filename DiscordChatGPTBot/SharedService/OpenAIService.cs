@@ -94,10 +94,10 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token))
                             {
                                 wordCount++;
-                                result += item.Replace("\\", "\\\\");
+                                result += item.Replace("\\", "\\\\").Replace("*", "\\*").Replace("|", "\\|").Replace("_", "\\_");
                                 if (!cts2.IsCancellationRequested) cts2.Cancel();
 
-                                result = result.Replace("\n\n", "\n").Replace("||", "\\|\\|");
+                                result = result.Replace("\n\n", "\n");
                                 if (result.EndWithDelim() || wordCount >= 100)
                                 {
                                     wordCount = 0;
