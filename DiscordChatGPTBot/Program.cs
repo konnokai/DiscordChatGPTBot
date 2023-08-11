@@ -273,47 +273,41 @@ namespace DiscordChatGPTBot
 
         public static void ChangeStatus()
         {
-            Action<string> setGame = new Action<string>(async (text) =>
+            Task.Run(async () =>
             {
-                try
+                switch (Status)
                 {
-                    await _client.SetGameAsync($"c!h | {text}", type: ActivityType.Playing);
+                    case BotPlayingStatus.Guild:
+                        await _client.SetCustomStatusAsync($"在 {_client.Guilds.Count} 個伺服器");
+                        Status = BotPlayingStatus.Member;
+                        break;
+                    case BotPlayingStatus.Member:
+                        try
+                        {
+                            await _client.SetCustomStatusAsync($"服務 {_client.Guilds.Sum((x) => x.MemberCount)} 個成員");
+                            Status = BotPlayingStatus.ExecutedTokenCount;
+                        }
+                        catch (Exception) { Status = BotPlayingStatus.ExecutedTokenCount; ChangeStatus(); }
+                        break;
+                    case BotPlayingStatus.ExecutedTokenCount:
+                        Status = BotPlayingStatus.Info;
+                        try
+                        {
+                            // Todo: 補齊這個
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error("ChangeStatus");
+                            Log.Error(ex.Message);
+                            ChangeStatus();
+                        }
+                        break;
+                    case BotPlayingStatus.Info:
+                        await _client.SetCustomStatusAsync("去跟其他人聊天啦");
+                        Status = BotPlayingStatus.Guild;
+                        break;
                 }
-                catch (Exception) { }
             });
-
-            switch (Status)
-            {
-                case BotPlayingStatus.Guild:
-                    setGame($"在 {_client.Guilds.Count} 個伺服器");
-                    Status = BotPlayingStatus.Member;
-                    break;
-                case BotPlayingStatus.Member:
-                    try
-                    {
-                        setGame($"服務 {_client.Guilds.Sum((x) => x.MemberCount)} 個成員");
-                        Status = BotPlayingStatus.ExecutedTokenCount;
-                    }
-                    catch (Exception) { Status = BotPlayingStatus.ExecutedTokenCount; ChangeStatus(); }
-                    break;
-                case BotPlayingStatus.ExecutedTokenCount:
-                    Status = BotPlayingStatus.Info;
-                    try
-                    {
-                        // Todo: 補齊這個
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error("ChangeStatus");
-                        Log.Error(ex.Message);
-                        ChangeStatus();
-                    }
-                    break;
-                case BotPlayingStatus.Info:
-                    setGame("去跟其他人聊天啦");
-                    Status = BotPlayingStatus.Guild;
-                    break;
-            }
         }
 
         public static string GetDataFilePath(string fileName)
