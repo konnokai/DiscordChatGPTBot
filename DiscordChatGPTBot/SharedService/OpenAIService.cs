@@ -2,10 +2,11 @@
 using DiscordChatGPTBot.Interaction;
 using OpenAI;
 using OpenAI.Chat;
-using OpenAI.Models;
+using SharpToken;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Model = OpenAI.Models.Model;
 
 namespace DiscordChatGPTBot.SharedService.OpenAI
 {
@@ -272,9 +273,13 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 throw new InvalidOperationException("APIKey解密失敗");
             }
 
+            // https://blog.miniasp.com/post/2023/09/22/Use-SharpToken-to-count-number-of-tokens
+            var encoding = GptEncoding.GetEncoding("cl100k_base");
             OpenAIClient _openAIClient = new OpenAIClient(desKey);
 
             var chatPrompts = GetOrAddChatPrompt(channelId);
+            var systemTokenCount = encoding.Encode(chatPrompts.First().Content).Count;
+            Log.Debug($"systemTokenCount: {systemTokenCount}");
             chatPrompts.AddChat(Role.User, chat);
 
             var chatRequest = new ChatRequest(chatPrompts, Model.GPT3_5_Turbo, user: $"{guildId}-{channelId}-{userId}");
@@ -295,18 +300,29 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                     completionMessage += result.FirstChoice.Delta.Content;
                     yield return result.FirstChoice.Delta.Content;
                 }
-
-                // Todo: 確認Token的使用量
-                // 目前Library回傳不了使用量導致無法確認還有多少Token可用
-                // result.Usage.TotalTokens
             }
+
+            var chatTokenCount = chatPrompts.Sum((x) => encoding.Encode(x.Content).Count) + 11; // 不知道為何會缺少 11 Token
+            var completionTokenCount = encoding.Encode(completionMessage).Count;
 
             chatPrompts.AddChat(Role.Assistant, completionMessage);
             _lastSendMessageTimestamp.AddOrUpdate(channelId, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
 
+            Log.Debug($"chatTokenCount: {chatTokenCount}, completionTokenCount: {completionTokenCount}, totalTokenCount: {chatTokenCount + completionTokenCount}");
+
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                db.ChatHistroy.Add(new DataBase.Table.ChatHistroy() { GuildId = guildId, ChannelId = channelId, UserId = userId, SystemPrompt = chatPrompts.First().Content, UserPrompt = chat });
+                db.ChatHistroy.Add(new DataBase.Table.ChatHistroy()
+                {
+                    GuildId = guildId,
+                    ChannelId = channelId,
+                    UserId = userId,
+                    SystemPrompt = chatPrompts.First().Content,
+                    UserPrompt = chat,
+                    ChatUseTokenCount = chatTokenCount,
+                    ResultUseTokenCount = completionTokenCount,
+                    TotlaUseTokenCount = chatTokenCount + completionTokenCount
+                });
                 db.SaveChanges();
             }
         }
