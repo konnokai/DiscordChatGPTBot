@@ -278,11 +278,12 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             OpenAIClient _openAIClient = new OpenAIClient(desKey);
 
             var chatPrompts = GetOrAddChatPrompt(channelId);
+            var chatGPTModel = GetChatGPTModel(channelId);
             var systemTokenCount = encoding.Encode(chatPrompts.First().Content).Count;
             Log.Debug($"systemTokenCount: {systemTokenCount}");
             chatPrompts.AddChat(Role.User, chat);
 
-            var chatRequest = new ChatRequest(chatPrompts, Model.GPT3_5_Turbo, user: $"{guildId}-{channelId}-{userId}");
+            var chatRequest = new ChatRequest(chatPrompts, chatGPTModel, user: $"{guildId}-{channelId}-{userId}");
             string completionMessage = "";
 
             await foreach (var result in _openAIClient.ChatEndpoint.StreamCompletionEnumerableAsync(chatRequest, cancellationToken))
@@ -333,6 +334,22 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             return channelConfig == null
                 ? throw new InvalidOperationException("資料庫無此頻道的資料")
                 : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<Message>() { new Message(Role.System, channelConfig.SystemPrompt) });
+        }
+
+        private Model GetChatGPTModel(ulong channelId)
+        {
+            var channelConfig = _channelConfigs.SingleOrDefault((x) => x.ChannelId == channelId);
+            if (channelConfig == null)
+                return Model.GPT3_5_Turbo;
+
+            return channelConfig.UsedChatGPTModel switch
+            {
+                DataBase.Table.ChannelConfig.ChatGPTModel.GPT3_5_Turbo => Model.GPT3_5_Turbo,
+                DataBase.Table.ChannelConfig.ChatGPTModel.GPT3_5_Turbo_16K => Model.GPT3_5_Turbo_16K,
+                DataBase.Table.ChannelConfig.ChatGPTModel.GPT4 => Model.GPT4,
+                DataBase.Table.ChannelConfig.ChatGPTModel.GPT4_32K => Model.GPT4_32K,
+                _ => Model.GPT3_5_Turbo,
+            };
         }
     }
 

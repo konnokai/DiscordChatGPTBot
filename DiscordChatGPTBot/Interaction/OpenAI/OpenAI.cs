@@ -190,6 +190,29 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
+        [SlashCommand("set-chatgpt-model", "設定 ChatGPT 的模型")]
+        [RequireContext(ContextType.Guild)]
+        [DefaultMemberPermissions(GuildPermission.Administrator)]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task SetChatGPTModel([Summary("模型", "預設使用 GPT3.5 Turbo 4K")] ChannelConfig.ChatGPTModel chatGPTModel = ChannelConfig.ChatGPTModel.GPT3_5_Turbo)
+        {
+            using (var db = DataBase.MainDbContext.GetDbContext())
+            {
+                var channelConfig = await EnsureChannelIsActiveAndGetConfigAsync();
+                if (channelConfig == null)
+                    return;
+
+                channelConfig.UsedChatGPTModel = chatGPTModel;
+                db.ChannelConfig.Update(channelConfig);
+                db.SaveChanges();
+
+                await Context.Interaction.SendConfirmAsync($"已更新此頻道所使用的 ChatGPT 模型為 `{chatGPTModel}`");
+
+                _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
+                _service.RefreshChannelConfig();
+            }
+        }
+
         [SlashCommand("set-complete-emote", "設定回應完成時的表情")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
