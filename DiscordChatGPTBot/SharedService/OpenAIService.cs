@@ -123,14 +123,14 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                         {
-                            string message = GetOpenAIErrorMessage("已達到ChatGPT請求上限，請稍後再試", httpEx.Message);
+                            string message = GetOpenAIErrorMessage("已達到 ChatGPT 請求上限，請稍後再試", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             Log.Error("HandleAIChat-429 Error");
                             isResponed = true;
                         }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
                         {
-                            string message = GetOpenAIErrorMessage("錯誤的請求，可能是已達到ChatGPT的Token上限，請嘗試 `/reset` 後重新發言", httpEx.Message);
+                            string message = GetOpenAIErrorMessage("錯誤的請求，可能是已達到 ChatGPT 的 Token 上限，請嘗試 `/reset` 後重新發言", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             Log.Error("HandleAIChat-400 Error");
                             Log.Error(message);
@@ -138,7 +138,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         }
                         catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.InternalServerError)
                         {
-                            string message = GetOpenAIErrorMessage("ChatGPT伺服器出現問題，請稍後再試", httpEx.Message);
+                            string message = GetOpenAIErrorMessage("ChatGPT 伺服器出現問題，請稍後再試", httpEx.Message);
                             await msg.ModifyAsync((act) => act.Content = message);
                             Log.Error("HandleAIChat-500 Error");
                             isResponed = true;
@@ -147,7 +147,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                         catch (Exception ex)
                         {
                             await msg.ModifyAsync((act) =>
-                            act.Content = $"出現錯誤，請向Bot擁有者確認\n" +
+                            act.Content = $"出現錯誤，請向 Bot 擁有者確認\n" +
                                           $"```\n" +
                                           $"{ex.Message}\n" +
                                           $"```");
@@ -225,7 +225,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
         private async Task CheckReset(ulong guildId, ISocketMessageChannel channel)
         {
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.GuildId == guildId && x.ChannelId == channel.Id) ?? throw new InvalidOperationException("資料庫無此頻道的資料");
-            if (!channelConfig.IsEnable) throw new InvalidOperationException("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試");
+            if (!channelConfig.IsEnable) throw new InvalidOperationException("本頻道已關閉 ChatGPT 聊天功能，請管理員使用 `/toggle` 開啟後再試");
 
             var assistantPromptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x.Role == Role.Assistant);
             bool isTurnsMax = assistantPromptCount >= channelConfig.MaxTurns;
@@ -259,23 +259,23 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
         private async IAsyncEnumerable<string> ChatToAIAsync(ulong guildId, ulong channelId, ulong userId, string chat, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             if (!_guildOpenAIKey.TryGetValue(guildId, out string? apiKey))
-                throw new InvalidOperationException("APIKey未設置");
+                throw new InvalidOperationException("APIKey 未設置");
 
             string desKey;
             try
             {
                 desKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
                 if (string.IsNullOrEmpty(desKey) || desKey.Length != 51)
-                    throw new InvalidOperationException("APIKey解密失敗");
+                    throw new InvalidOperationException("APIKey 解密失敗");
             }
             catch
             {
-                throw new InvalidOperationException("APIKey解密失敗");
+                throw new InvalidOperationException("APIKey 解密失敗");
             }
 
             // https://blog.miniasp.com/post/2023/09/22/Use-SharpToken-to-count-number-of-tokens
             var encoding = GptEncoding.GetEncoding("cl100k_base");
-            OpenAIClient _openAIClient = new OpenAIClient(desKey);
+            OpenAIClient _openAIClient = new(desKey);
 
             var chatPrompts = GetOrAddChatPrompt(channelId);
             var chatGPTModel = GetChatGPTModel(channelId);

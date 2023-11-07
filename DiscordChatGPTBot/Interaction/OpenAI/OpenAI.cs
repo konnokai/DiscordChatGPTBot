@@ -48,15 +48,15 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
-        [SlashCommand("init", "初始化或更新本伺服器的OpenAI API設定")]
+        [SlashCommand("init", "初始化或更新本伺服器的 OpenAI API 設定")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task Initialization([Summary("open-ai-api-key", "OpenAI的API Key")] string apiKey)
+        public async Task Initialization([Summary("api-key", "OpenAI 的 API Key")] string apiKey)
         {
             if (!apiKey.StartsWith("sk-") || apiKey.Length != 51)
             {
-                await Context.Interaction.SendErrorAsync("OpenAI API Key格式錯誤，請輸入正確的API Key");
+                await Context.Interaction.SendErrorAsync("OpenAI API Key 格式錯誤，請輸入正確的 API Key");
                 return;
             }
 
@@ -79,11 +79,11 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 db.SaveChanges();
                 _service.RefreshGuildConfig();
 
-                await Context.Interaction.SendConfirmAsync("已更新OpenAI API Key", false, true);
+                await Context.Interaction.SendConfirmAsync("已更新 OpenAI API Key", false, true);
             }
         }
 
-        [SlashCommand("revoke", "撤銷本伺服器的OpenAI API Key並取消使用ChatGPT聊天功能")]
+        [SlashCommand("revoke", "撤銷本伺服器的 OpenAI API Key 並取消使用 ChatGPT 聊天功能")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
@@ -97,7 +97,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 await DeferAsync(true);
 
-                if (await PromptUserConfirmAsync("撤銷API Key將會連同移除本伺服器的ChatGPT聊天設定，是否繼續?"))
+                if (await PromptUserConfirmAsync("撤銷 API Key 將會連同移除本伺服器的 ChatGPT 聊天設定，是否繼續?"))
                 {
                     db.GuildConfig.Remove(guildConfig);
                     db.ChannelConfig.RemoveRange(db.ChannelConfig.Where((x) => x.GuildId == Context.Guild.Id));
@@ -110,11 +110,11 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
-        [SlashCommand("active", "在此頻道啟用ChatGPT聊天功能")]
+        [SlashCommand("active", "在此頻道啟用 ChatGPT 聊天功能")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task Active([Summary("system-prompt", "人設，可使用 \"/set-system-prompt\" 變更")] string prompt = "你是一個有幫助的助手。使用繁體中文回答問題。")
+        public async Task Active([Summary("人設", "可使用 \"/set-system-prompt\" 變更")] string prompt = "你是一個有幫助的助手。使用繁體中文回答問題。")
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
@@ -164,11 +164,11 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
-        [SlashCommand("set-system-prompt", "設定ChatGPT的人設")]
+        [SlashCommand("set-system-prompt", "設定 ChatGPT 的人設")]
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetSystemPrompt([Summary("system-prompt", "人設，預設值: 你是一個有幫助的助手。使用繁體中文回答問題。")] string prompt = "你是一個有幫助的助手。使用繁體中文回答問題。")
+        public async Task SetSystemPrompt([Summary("人設", "預設值: 你是一個有幫助的助手。使用繁體中文回答問題。")] string prompt = "你是一個有幫助的助手。使用繁體中文回答問題。")
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
@@ -217,7 +217,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetCompletedEmote([Summary("emote", "表情，可使用本伺服器表情或Disord內建表情")] string emoteName)
+        public async Task SetCompletedEmote([Summary("表情", "可使用本伺服器表情或 Disord 內建表情")] string emoteName)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
@@ -256,7 +256,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             }
         }
 
-        [SlashCommand("show-system-prompt", "顯示ChatGPT的人設")]
+        [SlashCommand("show-system-prompt", "顯示 ChatGPT 的人設")]
         [RequireContext(ContextType.Guild)]
         public async Task ShowSystemPrompt()
         {
@@ -266,7 +266,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 if (channelConfig == null)
                     return;
 
-                await Context.Interaction.SendConfirmAsync("本頻道的ChatGPT人設:\n" +
+                await Context.Interaction.SendConfirmAsync("本頻道的 ChatGPT 人設:\n" +
                     $"```\n" +
                     $"{channelConfig.SystemPrompt}\n" +
                     $"```");
@@ -298,14 +298,14 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 db.ChannelConfig.Update(channelConfig);
                 db.SaveChanges();
 
-                await Context.Interaction.SendConfirmAsync("設定ChatGPT聊天功能為: " + (channelConfig.IsEnable ? "開啟" : "關閉") +
+                await Context.Interaction.SendConfirmAsync("設定 ChatGPT 聊天功能為: " + (channelConfig.IsEnable ? "開啟" : "關閉") +
                     "\n當重置時繼承最後三次的對話: " + (channelConfig.IsInheritChatWhenReset ? "開啟" : "關閉"));
                 _service.ForceReset(Context.Guild.Id, Context.Channel.Id);
                 _service.RefreshChannelConfig();
             }
         }
 
-        [SlashCommand("say", "跟ChatGPT對話")]
+        [SlashCommand("say", "跟 ChatGPT 對話")]
         [RequireContext(ContextType.Guild)]
         public async Task Say(string message)
         {
@@ -318,7 +318,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 if (!channelConfig.IsEnable)
                 {
-                    await Context.Interaction.SendErrorAsync("本頻道已關閉ChatGPT聊天功能，請管理員使用 `/toggle` 開啟後再試", true);
+                    await Context.Interaction.SendErrorAsync("本頻道已關閉 ChatGPT 聊天功能，請管理員使用 `/toggle` 開啟後再試", true);
                     return;
                 }
             }
