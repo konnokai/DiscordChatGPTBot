@@ -143,6 +143,14 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                             Log.Error("HandleAIChat-500 Error");
                             isResponed = true;
                         }
+                        catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                        {
+                            string message = GetOpenAIErrorMessage("錯誤，可能是 API Key 錯誤", httpEx.Message);
+                            await msg.ModifyAsync((act) => act.Content = message);
+                            Log.Error("HandleAIChat-403 Error");
+                            Log.Error(message);
+                            isResponed = true;
+                        }
                         catch (IOException ioEx) when (ioEx.Message.Contains("The response ended prematurely")) { } // 忘記這是幹嘛的
                         catch (Exception ex)
                         {
