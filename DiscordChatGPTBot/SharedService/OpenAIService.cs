@@ -1,4 +1,5 @@
 ﻿using DiscordChatGPTBot.Auth;
+using DiscordChatGPTBot.DataBase.Table;
 using DiscordChatGPTBot.Interaction;
 using OpenAI;
 using OpenAI.Chat;
@@ -352,10 +353,11 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
             return channelConfig.UsedChatGPTModel switch
             {
-                DataBase.Table.ChannelConfig.ChatGPTModel.GPT3_5_Turbo => Model.GPT3_5_Turbo,
-                DataBase.Table.ChannelConfig.ChatGPTModel.GPT3_5_Turbo_16K => Model.GPT3_5_Turbo_16K,
-                DataBase.Table.ChannelConfig.ChatGPTModel.GPT4 => Model.GPT4,
-                DataBase.Table.ChannelConfig.ChatGPTModel.GPT4_32K => Model.GPT4_32K,
+                ChannelConfig.ChatGPTModel.GPT3_5_Turbo => Model.GPT3_5_Turbo,
+                ChannelConfig.ChatGPTModel.GPT3_5_Turbo_16K => Model.GPT3_5_Turbo_16K,
+                ChannelConfig.ChatGPTModel.GPT4 => Model.GPT4,
+                ChannelConfig.ChatGPTModel.GPT4_32K => Model.GPT4_32K,
+                ChannelConfig.ChatGPTModel.GPT4_Turbo => new Model("GPT-4-1106-preview", "openai"),
                 _ => Model.GPT3_5_Turbo,
             };
         }
