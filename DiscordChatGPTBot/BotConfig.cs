@@ -1,4 +1,6 @@
-﻿public class BotConfig
+﻿using DiscordChatGPTBot;
+
+public class BotConfig
 {
     public string DiscordToken { get; set; } = "";
     public string AESKey { get; set; } = "";
@@ -9,13 +11,27 @@
 
     public void InitBotConfig()
     {
-        try { File.WriteAllText("bot_config_example.json", JsonConvert.SerializeObject(new BotConfig(), Formatting.Indented)); } catch { }
-        if (!File.Exists("bot_config.json"))
+        if (Utility.InDocker)
         {
-            Log.Error($"bot_config.json遺失，請依照 {Path.GetFullPath("bot_config_example.json")} 內的格式填入正確的數值");
-            if (!Console.IsInputRedirected)
-                Console.ReadKey();
-            Environment.Exit(3);
+            if (!File.Exists("bot_config.json") || string.IsNullOrEmpty( File.ReadAllText("bot_config.json")))
+            {
+                try { File.WriteAllText("bot_config.json", JsonConvert.SerializeObject(new BotConfig(), Formatting.Indented)); } catch { }
+                Log.Error($"bot_config.json 遺失，請依照 {Path.GetFullPath("bot_config.json")} 內的格式填入正確的數值");
+                if (!Console.IsInputRedirected)
+                    Console.ReadKey();
+                Environment.Exit(0);
+            }
+        }
+        else
+        {
+            try { File.WriteAllText("bot_config_example.json", JsonConvert.SerializeObject(new BotConfig(), Formatting.Indented)); } catch { }
+            if (!File.Exists("bot_config.json"))
+            {
+                Log.Error($"bot_config.json 遺失，請依照 {Path.GetFullPath("bot_config_example.json")} 內的格式填入正確的數值");
+                if (!Console.IsInputRedirected)
+                    Console.ReadKey();
+                Environment.Exit(3);
+            }
         }
 
         try
@@ -24,7 +40,7 @@
 
             if (string.IsNullOrWhiteSpace(config.DiscordToken))
             {
-                Log.Error($"{nameof(DiscordToken)}遺失，請輸入至bot_config.json後重開Bot");
+                Log.Error($"{nameof(DiscordToken)}遺失，請輸入至 bot_config.json 後重開Bot");
                 if (!Console.IsInputRedirected)
                     Console.ReadKey();
                 Environment.Exit(3);
@@ -32,7 +48,7 @@
 
             if (string.IsNullOrWhiteSpace(config.WebHookUrl))
             {
-                Log.Error($"{nameof(WebHookUrl)}遺失，請輸入至bot_config.json後重開Bot");
+                Log.Error($"{nameof(WebHookUrl)}遺失，請輸入至 bot_config.json 後重開Bot");
                 if (!Console.IsInputRedirected)
                     Console.ReadKey();
                 Environment.Exit(3);

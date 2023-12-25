@@ -4,6 +4,6 @@ services:
     container_name: discord-chat-gpt
     build: .
     volumes:
-      - ./Data:/app/Data
-      - ./bot_config.json:/app/bot_config.json
+      - ${PWD}/Data:/app/Data
+      - ${PWD}/bot_config.json:/app/bot_config.json
     restart: unless-stopped
