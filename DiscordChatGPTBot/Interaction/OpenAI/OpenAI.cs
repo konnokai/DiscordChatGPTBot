@@ -42,7 +42,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             {
                 ChannelConfig? channelConfig = db.ChannelConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id && x.ChannelId == Context.Channel.Id);
                 if (channelConfig == null && sendErrorMsg)
-                    await Context.Interaction.SendErrorAsync("本頻道尚未啟ChatGPT聊天功能，請使用 `/active` 後再試");
+                    await Context.Interaction.SendErrorAsync("本頻道尚未啟 ChatGPT 聊天功能，請使用 `/active` 後再試");
 
                 return channelConfig;
             }
@@ -153,7 +153,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
                 _service.RefreshChannelConfig();
 
-                await Context.Interaction.SendConfirmAsync($"已在此頻道啟用ChatGPT對話功能\n" +
+                await Context.Interaction.SendConfirmAsync($"已在此頻道啟用 ChatGPT 對話功能\n" +
                     $"如需更改人設請使用 `/set-system-prompt`\n" +
                     $"如需更改完成表情請使用 `/set-complete-emote`\n" +
                     $"如需切換開關請使用 `/toggle`\n" +
@@ -168,7 +168,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetSystemPrompt([Summary("人設", "預設值: 你是一個有幫助的助手。使用繁體中文回答問題。")] string prompt = "你是一個有幫助的助手。使用繁體中文回答問題。")
+        public async Task SetSystemPrompt([Summary("人設", "預設值: 你是一個有幫助的助手。使用正體中文回答問題。")] string prompt = "你是一個有幫助的助手。使用正體中文回答問題。")
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
@@ -180,7 +180,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 db.ChannelConfig.Update(channelConfig);
                 db.SaveChanges();
 
-                await Context.Interaction.SendConfirmAsync("已更新ChatGPT人設:\n" +
+                await Context.Interaction.SendConfirmAsync("已更新 ChatGPT 人設:\n" +
                     $"```\n" +
                     $"{prompt}\n" +
                     $"```");
@@ -217,7 +217,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetCompletedEmote([Summary("表情", "可使用本伺服器表情或 Disord 內建表情")] string emoteName)
+        public async Task SetCompletedEmote([Summary("表情", "可使用本伺服器表情或 Discord 內建表情")] string emoteName)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
