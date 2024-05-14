@@ -4,7 +4,7 @@ using DiscordChatGPTBot.DataBase.Table;
 
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
-    [EnabledInDm(false)]
+    [CommandContextType(InteractionContextType.Guild)]
     public class OpenAI : TopLevelModule<SharedService.OpenAI.OpenAIService>
     {
         public enum ToggleSetting
@@ -144,6 +144,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                     await Context.Interaction.SendErrorAsync("本頻道已啟用\n" +
                         $"如需更改人設請使用 `/set-system-prompt`\n" +
                         $"如需更改完成表情請使用 `/set-complete-emote`\n" +
+                        $"如需更改模型請使用 `/set-chatgpt-model`\n" +
                         $"如需切換開關請使用 `/toggle`");
                     return;
                 }
@@ -156,6 +157,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
                 await Context.Interaction.SendConfirmAsync($"已在此頻道啟用 ChatGPT 對話功能\n" +
                     $"如需更改人設請使用 `/set-system-prompt`\n" +
                     $"如需更改完成表情請使用 `/set-complete-emote`\n" +
+                    $"如需更改模型請使用 `/set-chatgpt-model`\n" +
                     $"如需切換開關請使用 `/toggle`\n" +
                     $"ChatGPT人設:\n" +
                     $"```\n" +
@@ -194,7 +196,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetChatGPTModel([Summary("模型", "預設使用 GPT3.5 Turbo 4K")] ChannelConfig.ChatGPTModel chatGPTModel = ChannelConfig.ChatGPTModel.GPT3_5_Turbo)
+        public async Task SetChatGPTModel([Summary("模型", "預設使用 GPT-4 Turbo")] ChannelConfig.ChatGPTModel chatGPTModel = ChannelConfig.ChatGPTModel.GPT3_5_Turbo)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {

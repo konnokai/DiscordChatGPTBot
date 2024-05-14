@@ -357,8 +357,9 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 ChannelConfig.ChatGPTModel.GPT3_5_Turbo_16K => Model.GPT3_5_Turbo_16K,
                 ChannelConfig.ChatGPTModel.GPT4 => Model.GPT4,
                 ChannelConfig.ChatGPTModel.GPT4_32K => Model.GPT4_32K,
-                ChannelConfig.ChatGPTModel.GPT4_Turbo => new Model("gpt-4-turbo-preview", "openai"),
-                _ => Model.GPT3_5_Turbo,
+                ChannelConfig.ChatGPTModel.GPT4_Turbo => Model.GPT4_Turbo,
+                ChannelConfig.ChatGPTModel.GPT4_o => new Model("gpt-4o", "openai"),
+                _ => Model.GPT4_Turbo,
             };
         }
     }

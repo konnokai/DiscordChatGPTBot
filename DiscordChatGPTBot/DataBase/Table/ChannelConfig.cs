@@ -8,7 +8,8 @@
             GPT3_5_Turbo_16K,
             GPT4,
             GPT4_32K,
-            GPT4_Turbo
+            GPT4_Turbo,
+            GPT4_o
         }
 
         public ulong GuildId { get; set; }
