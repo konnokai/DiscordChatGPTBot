@@ -196,7 +196,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireContext(ContextType.Guild)]
         [DefaultMemberPermissions(GuildPermission.Administrator)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task SetChatGPTModel([Summary("模型", "預設使用 GPT-4 Turbo")] ChannelConfig.ChatGPTModel chatGPTModel = ChannelConfig.ChatGPTModel.GPT3_5_Turbo)
+        public async Task SetChatGPTModel([Summary("模型", "預設使用 GPT-4o Mini")] ChannelConfig.ChatGPTModel chatGPTModel = ChannelConfig.ChatGPTModel.GPT4o_Mini)
         {
             using (var db = DataBase.MainDbContext.GetDbContext())
             {

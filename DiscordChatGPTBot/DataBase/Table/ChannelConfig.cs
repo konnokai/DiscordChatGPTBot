@@ -9,7 +9,8 @@
             GPT4,
             GPT4_32K,
             GPT4_Turbo,
-            GPT4_o
+            GPT4o,
+            GPT4o_Mini
         }
 
         public ulong GuildId { get; set; }
@@ -18,7 +19,7 @@
         public bool IsInheritChatWhenReset { get; set; } = false;
         public string SystemPrompt { get; set; } = "你是一個有幫助的助手。使用繁體中文回答問題。";
         public string CompletedEmoji { get; set; } = ":ok:";
-        public ChatGPTModel UsedChatGPTModel { get; set; } = ChatGPTModel.GPT3_5_Turbo;
+        public ChatGPTModel UsedChatGPTModel { get; set; } = ChatGPTModel.GPT4o_Mini;
         public uint ResetDeltaTime { get; set; } = 3600;
         public uint MaxTurns { get; set; } = 10;
     }

@@ -295,7 +295,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             var chatRequest = new ChatRequest(chatPrompts, chatGPTModel, user: $"{guildId}-{channelId}-{userId}");
             string completionMessage = "";
 
-            await foreach (var result in _openAIClient.ChatEndpoint.StreamCompletionEnumerableAsync(chatRequest, cancellationToken))
+            await foreach (var result in _openAIClient.ChatEndpoint.StreamCompletionEnumerableAsync(chatRequest, true, cancellationToken))
             {
                 Log.Debug(JsonConvert.SerializeObject(result));
 
@@ -322,7 +322,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
             using (var db = DataBase.MainDbContext.GetDbContext())
             {
-                db.ChatHistroy.Add(new DataBase.Table.ChatHistroy()
+                db.ChatHistroy.Add(new ChatHistroy()
                 {
                     GuildId = guildId,
                     ChannelId = channelId,
@@ -358,15 +358,16 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 ChannelConfig.ChatGPTModel.GPT4 => Model.GPT4,
                 ChannelConfig.ChatGPTModel.GPT4_32K => Model.GPT4_32K,
                 ChannelConfig.ChatGPTModel.GPT4_Turbo => Model.GPT4_Turbo,
-                ChannelConfig.ChatGPTModel.GPT4_o => new Model("gpt-4o", "openai"),
-                _ => Model.GPT4_Turbo,
+                ChannelConfig.ChatGPTModel.GPT4o => Model.GPT4o,
+                ChannelConfig.ChatGPTModel.GPT4o_Mini => new Model("gpt-4o-mini", "openai"),
+                _ => Model.GPT4o,
             };
         }
     }
 
     static class Ext
     {
-        private static readonly string[] Delims = new string[] { "\n", ",", ".", "，", "。", "、", "：", "）", "」", "}", "]" };
+        private static readonly string[] Delims = new string[] { "\n", "。" };
 
         public static void AddChat(this List<Message> chatPrompts, Role role, string chat)
         {
