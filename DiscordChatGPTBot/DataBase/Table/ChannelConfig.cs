@@ -4,13 +4,8 @@
     {
         public enum ChatGPTModel
         {
-            GPT3_5_Turbo,
-            GPT3_5_Turbo_16K,
-            GPT4,
-            GPT4_32K,
-            GPT4_Turbo,
-            GPT4o,
-            GPT4o_Mini
+            GPT4o = 0,
+            GPT4o_Mini = 1
         }
 
         public ulong GuildId { get; set; }

@@ -8,9 +8,9 @@ namespace DiscordChatGPTBot.Command
         private readonly DiscordSocketClient _client;
         private readonly CommandService _commands;
         private readonly IServiceProvider _services;
-        private readonly SharedService.OpenAI.OpenAIService _openAIService;
+        private readonly SharedService.OpenAIService.OpenAIService _openAIService;
 
-        public CommandHandler(IServiceProvider services, CommandService commands, DiscordSocketClient client, SharedService.OpenAI.OpenAIService openAIService)
+        public CommandHandler(IServiceProvider services, CommandService commands, DiscordSocketClient client, SharedService.OpenAIService.OpenAIService openAIService)
         {
             _commands = commands;
             _services = services;
@@ -66,7 +66,7 @@ namespace DiscordChatGPTBot.Command
                         return;
 
                     Log.Info($"[{channel.Guild?.Name}/{channel?.Name}] {message.Author.Username}: {messageWithoutUser}");
-                    await _openAIService.HandleAIChat(channel!.Guild!.Id, channel, message.Author.Id, messageWithoutUser);
+                    await _openAIService.HandleAIChat(channel!.Guild!.Id, channel, message.Author.Id, messageWithoutUser, message.Attachments != null ? message.Attachments.Select((x) => x.Url).ToArray() : Array.Empty<string>());
                 }
                 catch (Exception ex)
                 {

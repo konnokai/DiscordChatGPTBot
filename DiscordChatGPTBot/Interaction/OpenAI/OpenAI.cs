@@ -5,7 +5,7 @@ using DiscordChatGPTBot.DataBase.Table;
 namespace DiscordChatGPTBot.Interaction.OpenAI
 {
     [CommandContextType(InteractionContextType.Guild)]
-    public class OpenAI : TopLevelModule<SharedService.OpenAI.OpenAIService>
+    public class OpenAI : TopLevelModule<SharedService.OpenAIService.OpenAIService>
     {
         public enum ToggleSetting
         {
@@ -309,7 +309,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
 
         [SlashCommand("say", "跟 ChatGPT 對話")]
         [RequireContext(ContextType.Guild)]
-        public async Task Say(string message)
+        public async Task Say([Summary("訊息")] string message, [Summary("圖片")] IAttachment? attachment = null)
         {
             ChannelConfig? channelConfig;
             using (var db = DataBase.MainDbContext.GetDbContext())
@@ -328,7 +328,7 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
             try
             {
                 await Context.Interaction.SendConfirmAsync($"{Context.User}: {message}");
-                await _service.HandleAIChat(Context.Guild.Id, Context.Channel, Context.User.Id, message);
+                await _service.HandleAIChat(Context.Guild.Id, Context.Channel, Context.User.Id, message, attachment != null ? new string[] { attachment.Url } : Array.Empty<string>());
             }
             catch (Discord.Net.HttpException httpEx) when (httpEx.DiscordCode == DiscordErrorCode.MissingPermissions)
             {

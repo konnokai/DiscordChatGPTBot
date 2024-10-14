@@ -1,23 +1,21 @@
 ﻿using DiscordChatGPTBot.Auth;
 using DiscordChatGPTBot.DataBase.Table;
 using DiscordChatGPTBot.Interaction;
-using OpenAI;
+using Microsoft.EntityFrameworkCore;
 using OpenAI.Chat;
-using SharpToken;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using Model = OpenAI.Models.Model;
 
-namespace DiscordChatGPTBot.SharedService.OpenAI
+namespace DiscordChatGPTBot.SharedService.OpenAIService
 {
     public class OpenAIService : IInteractionService
     {
-        private readonly ConcurrentDictionary<string, List<Message>> _chatPrompt = new();
+        private readonly ConcurrentDictionary<string, List<ChatMessage>> _chatPrompt = new();
         private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
         private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
         private readonly ConcurrentDictionary<ulong, CancellationTokenSource> _cancellationTokenSource = new();
-        private readonly List<DataBase.Table.ChannelConfig> _channelConfigs = new();
+        private readonly List<ChannelConfig> _channelConfigs = new();
         private readonly HashSet<ulong> _runningChannels = new();
         private readonly BotConfig _botConfig;
 
@@ -30,22 +28,18 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
         public void RefreshChannelConfig()
         {
-            using (var db = DataBase.MainDbContext.GetDbContext())
-            {
-                _channelConfigs.Clear();
-                _channelConfigs.AddRange(db.ChannelConfig);
-            }
+            using var db = DataBase.MainDbContext.GetDbContext();
+            _channelConfigs.Clear();
+            _channelConfigs.AddRange(db.ChannelConfig.AsNoTracking());
         }
 
         public void RefreshGuildConfig()
         {
-            using (var db = DataBase.MainDbContext.GetDbContext())
+            using var db = DataBase.MainDbContext.GetDbContext();
+            _guildOpenAIKey.Clear();
+            foreach (var item in db.GuildConfig.AsNoTracking())
             {
-                _guildOpenAIKey.Clear();
-                foreach (var item in db.GuildConfig)
-                {
-                    _guildOpenAIKey.AddOrUpdate(item.GuildId, item.OpenAIKey, (guildId, apiKey) => item.OpenAIKey);
-                }
+                _guildOpenAIKey.AddOrUpdate(item.GuildId, item.OpenAIKey, (guildId, apiKey) => item.OpenAIKey);
             }
         }
 
@@ -63,7 +57,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             return false;
         }
 
-        public async Task HandleAIChat(ulong guildId, ISocketMessageChannel channel, ulong userId, string message)
+        public async Task HandleAIChat(ulong guildId, ISocketMessageChannel channel, ulong userId, string message, params string[] imageUrls)
         {
             try
             {
@@ -86,21 +80,22 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                     var cts2 = new CancellationTokenSource();
                     string result = "";
 
-                    var waitingTask = Task.Delay(TimeSpan.FromSeconds(3), cts2.Token);
+                    // 加入圖片判定後，回應時間會拉長到至少需要五秒
+                    var waitingTask = Task.Delay(TimeSpan.FromSeconds(10), cts2.Token);
 
                     var mainTask = Task.Run(async () =>
                     {
                         try
                         {
                             int wordCount = 0;
-                            await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token))
+                            await foreach (var item in ChatToAIAsync(guildId, channel.Id, userId, message, cts.Token, imageUrls))
                             {
                                 wordCount++;
                                 result += item;
                                 if (!cts2.IsCancellationRequested) cts2.Cancel();
 
                                 result = result.Replace("\n\n", "\n");
-                                if (result.EndWithDelim() || wordCount >= 100)
+                                if (wordCount >= 200)
                                 {
                                     wordCount = 0;
                                     try { await msg.ModifyAsync((act) => act.Content = result); }
@@ -168,7 +163,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                     var completedTask = await Task.WhenAny(mainTask, waitingTask);
                     if (completedTask == waitingTask && !waitingTask.IsCanceled)
                     {
-                        // 如果等待Task先完成，就取消主要的Task
+                        // 如果等待 Task 先完成，就取消主要的 Task
                         cts.Cancel();
 
                         await msg.ModifyAsync((act) => act.Content = "等待訊息逾時，嘗試重新讀取中...");
@@ -236,7 +231,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.GuildId == guildId && x.ChannelId == channel.Id) ?? throw new InvalidOperationException("資料庫無此頻道的資料");
             if (!channelConfig.IsEnable) throw new InvalidOperationException("本頻道已關閉 ChatGPT 聊天功能，請管理員使用 `/toggle` 開啟後再試");
 
-            var assistantPromptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x.Role == Role.Assistant);
+            var assistantPromptCount = GetOrAddChatPrompt(channel.Id).Count((x) => x is AssistantChatMessage);
             bool isTurnsMax = assistantPromptCount >= channelConfig.MaxTurns;
 
             var dateTime = _lastSendMessageTimestamp.GetOrAdd(channel.Id, DateTime.Now);
@@ -251,7 +246,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
 
                 if (channelConfig.IsInheritChatWhenReset)
                 {
-                    var tempChatPrompt = GetOrAddChatPrompt(channel.Id).TakeLast(6).Where((x) => x.Role != Role.System);
+                    var tempChatPrompt = GetOrAddChatPrompt(channel.Id).TakeLast(6).Where((x) => x is not SystemChatMessage);
                     _chatPrompt.TryRemove($"{channel.Id}", out var _);
                     var chatPrompts = GetOrAddChatPrompt(channel.Id);
                     chatPrompts.AddRange(tempChatPrompt);
@@ -265,16 +260,17 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
             }
         }
 
-        private async IAsyncEnumerable<string> ChatToAIAsync(ulong guildId, ulong channelId, ulong userId, string chat, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        private string[] _allowImageExtArray = new[] { ".jpeg", ".jpg", ".gif", ".png" };
+        private async IAsyncEnumerable<string> ChatToAIAsync(ulong guildId, ulong channelId, ulong userId, string userMessage, [EnumeratorCancellation] CancellationToken cancellationToken = default, params string[] imageUrls)
         {
             if (!_guildOpenAIKey.TryGetValue(guildId, out string? apiKey))
                 throw new InvalidOperationException("APIKey 未設置");
 
-            string desKey;
+            string desApiKey;
             try
             {
-                desKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
-                if (string.IsNullOrEmpty(desKey) || desKey.Length != 51)
+                desApiKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
+                if (string.IsNullOrEmpty(desApiKey) || desApiKey.Length != 51)
                     throw new InvalidOperationException("APIKey 解密失敗");
             }
             catch
@@ -282,85 +278,82 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
                 throw new InvalidOperationException("APIKey 解密失敗");
             }
 
-            // https://blog.miniasp.com/post/2023/09/22/Use-SharpToken-to-count-number-of-tokens
-            var encoding = GptEncoding.GetEncoding("cl100k_base");
-            OpenAIClient _openAIClient = new(desKey);
-
             var chatPrompts = GetOrAddChatPrompt(channelId);
             var chatGPTModel = GetChatGPTModel(channelId);
-            var systemTokenCount = encoding.Encode(chatPrompts.First().Content).Count;
-            Log.Debug($"systemTokenCount: {systemTokenCount}");
-            chatPrompts.AddChat(Role.User, chat);
+            chatPrompts.AddChat(ChatMessageRole.User, userMessage);
 
-            var chatRequest = new ChatRequest(chatPrompts, chatGPTModel, user: $"{guildId}-{channelId}-{userId}");
+            foreach (var item in imageUrls)
+            {
+                string ext = Path.GetExtension(item);
+                if (!_allowImageExtArray.Any((x) => ext.StartsWith(x)))
+                    continue;
+
+                Log.Info($"添加圖片: {item}");
+                chatPrompts.Add(ChatMessage.CreateUserMessage(ChatMessageContentPart.CreateImagePart(new Uri(item))));
+            }
+
+            ChatClient _openAIClient = new(chatGPTModel, desApiKey);
+
+            var chatCompletionOptions = new ChatCompletionOptions() { ResponseFormat = ChatResponseFormat.CreateTextFormat(), EndUserId = $"{guildId}-{channelId}-{userId}" };
             string completionMessage = "";
+            ChatTokenUsage? chatTokenUsage = null;
 
-            await foreach (var result in _openAIClient.ChatEndpoint.StreamCompletionEnumerableAsync(chatRequest, true, cancellationToken))
+            await foreach (var result in _openAIClient.CompleteChatStreamingAsync(chatPrompts, chatCompletionOptions, cancellationToken))
             {
                 Log.Debug(JsonConvert.SerializeObject(result));
 
-                if (result?.FirstChoice?.FinishReason != null && result?.FirstChoice?.FinishReason == "stop")
-                    break;
-
-                if (result?.FirstChoice?.Delta == null)
-                    continue;
-
-                if (result.FirstChoice.Delta.Content != null)
+                if (result.Usage != null)
                 {
-                    completionMessage += result.FirstChoice.Delta.Content;
-                    yield return result.FirstChoice.Delta.Content;
+                    chatTokenUsage = result.Usage;
+                    break;
+                }
+
+                if (result.ContentUpdate.Count > 0)
+                {
+                    completionMessage += result.ContentUpdate.First().Text;
+                    yield return result.ContentUpdate.First().Text;
                 }
             }
 
-            var chatTokenCount = chatPrompts.Sum((x) => encoding.Encode(x.Content).Count) + 11; // 不知道為何會缺少 11 Token
-            var completionTokenCount = encoding.Encode(completionMessage).Count;
-
-            chatPrompts.AddChat(Role.Assistant, completionMessage);
+            chatPrompts.AddChat(ChatMessageRole.Assistant, completionMessage);
             _lastSendMessageTimestamp.AddOrUpdate(channelId, (channelId) => DateTime.Now, (channelId, dataTime) => DateTime.Now);
 
-            Log.Debug($"chatTokenCount: {chatTokenCount}, completionTokenCount: {completionTokenCount}, totalTokenCount: {chatTokenCount + completionTokenCount}");
+            Log.Debug($"chatTokenCount: {chatTokenUsage?.InputTokenCount}, completionTokenCount: {chatTokenUsage?.OutputTokenCount}, totalTokenCount: {chatTokenUsage?.TotalTokenCount}");
 
-            using (var db = DataBase.MainDbContext.GetDbContext())
+            using var db = DataBase.MainDbContext.GetDbContext();
+            db.ChatHistroy.Add(new ChatHistroy()
             {
-                db.ChatHistroy.Add(new ChatHistroy()
-                {
-                    GuildId = guildId,
-                    ChannelId = channelId,
-                    UserId = userId,
-                    SystemPrompt = chatPrompts.First().Content,
-                    UserPrompt = chat,
-                    ChatUseTokenCount = chatTokenCount,
-                    ResultUseTokenCount = completionTokenCount,
-                    TotlaUseTokenCount = chatTokenCount + completionTokenCount
-                });
-                db.SaveChanges();
-            }
+                GuildId = guildId,
+                ChannelId = channelId,
+                UserId = userId,
+                SystemPrompt = chatPrompts.First().Content.First().Text,
+                UserPrompt = userMessage,
+                ChatUseTokenCount = chatTokenUsage?.InputTokenCount ?? 0,
+                ResultUseTokenCount = chatTokenUsage?.OutputTokenCount ?? 0,
+                TotlaUseTokenCount = chatTokenUsage?.TotalTokenCount ?? 0
+            });
+            db.SaveChanges();
         }
 
-        private List<Message> GetOrAddChatPrompt(ulong channelId)
+        private List<ChatMessage> GetOrAddChatPrompt(ulong channelId)
         {
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.ChannelId == channelId);
             return channelConfig == null
                 ? throw new InvalidOperationException("資料庫無此頻道的資料")
-                : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<Message>() { new Message(Role.System, channelConfig.SystemPrompt) });
+                : _chatPrompt.GetOrAdd($"{channelId}", (key) => new List<ChatMessage>() { new SystemChatMessage(channelConfig.SystemPrompt) });
         }
 
-        private Model GetChatGPTModel(ulong channelId)
+        private string GetChatGPTModel(ulong channelId)
         {
             var channelConfig = _channelConfigs.SingleOrDefault((x) => x.ChannelId == channelId);
             if (channelConfig == null)
-                return Model.GPT3_5_Turbo;
+                return "gpt-4o-mini";
 
             return channelConfig.UsedChatGPTModel switch
             {
-                ChannelConfig.ChatGPTModel.GPT3_5_Turbo => Model.GPT3_5_Turbo,
-                ChannelConfig.ChatGPTModel.GPT3_5_Turbo_16K => Model.GPT3_5_Turbo_16K,
-                ChannelConfig.ChatGPTModel.GPT4 => Model.GPT4,
-                ChannelConfig.ChatGPTModel.GPT4_32K => Model.GPT4_32K,
-                ChannelConfig.ChatGPTModel.GPT4_Turbo => Model.GPT4_Turbo,
-                ChannelConfig.ChatGPTModel.GPT4o => Model.GPT4o,
-                ChannelConfig.ChatGPTModel.GPT4o_Mini => new Model("gpt-4o-mini", "openai"),
-                _ => Model.GPT4o,
+                ChannelConfig.ChatGPTModel.GPT4o => "gpt-4o",
+                ChannelConfig.ChatGPTModel.GPT4o_Mini => "gpt-4o-mini",
+                _ => "gpt-4o-mini",
             };
         }
     }
@@ -369,9 +362,24 @@ namespace DiscordChatGPTBot.SharedService.OpenAI
     {
         private static readonly string[] Delims = new string[] { "\n", "。" };
 
-        public static void AddChat(this List<Message> chatPrompts, Role role, string chat)
+        public static void AddChat(this List<ChatMessage> chatPrompts, ChatMessageRole role, string chat)
         {
-            chatPrompts.Add(new Message(role, chat));
+            switch (role)
+            {
+                case ChatMessageRole.System:
+                    chatPrompts.Add(new SystemChatMessage(chat));
+                    break;
+                case ChatMessageRole.User:
+                    chatPrompts.Add(new UserChatMessage(chat));
+                    break;
+                case ChatMessageRole.Assistant:
+                    chatPrompts.Add(new AssistantChatMessage(chat));
+                    break;
+                case ChatMessageRole.Function:
+                case ChatMessageRole.Tool:
+                    chatPrompts.Add(new ToolChatMessage(chat));
+                    break;
+            }
         }
 
         public static bool EndWithDelim(this string context)

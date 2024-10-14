@@ -13,7 +13,7 @@ public class BotConfig
     {
         if (Utility.InDocker)
         {
-            if (!File.Exists("bot_config.json") || string.IsNullOrEmpty( File.ReadAllText("bot_config.json")))
+            if (!File.Exists("bot_config.json") || string.IsNullOrEmpty(File.ReadAllText("bot_config.json")))
             {
                 try { File.WriteAllText("bot_config.json", JsonConvert.SerializeObject(new BotConfig(), Formatting.Indented)); } catch { }
                 Log.Error($"bot_config.json 遺失，請依照 {Path.GetFullPath("bot_config.json")} 內的格式填入正確的數值");
