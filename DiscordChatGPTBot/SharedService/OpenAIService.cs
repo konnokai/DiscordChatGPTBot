@@ -11,6 +11,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAIService
 {
     public class OpenAIService : IInteractionService
     {
+        private string[] _allowImageExtArray = new[] { ".jpeg", ".jpg", ".gif", ".png" };
         private readonly ConcurrentDictionary<string, List<ChatMessage>> _chatPrompt = new();
         private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
         private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
@@ -260,7 +261,6 @@ namespace DiscordChatGPTBot.SharedService.OpenAIService
             }
         }
 
-        private string[] _allowImageExtArray = new[] { ".jpeg", ".jpg", ".gif", ".png" };
         private async IAsyncEnumerable<string> ChatToAIAsync(ulong guildId, ulong channelId, ulong userId, string userMessage, [EnumeratorCancellation] CancellationToken cancellationToken = default, params string[] imageUrls)
         {
             if (!_guildOpenAIKey.TryGetValue(guildId, out string? apiKey))
@@ -284,8 +284,8 @@ namespace DiscordChatGPTBot.SharedService.OpenAIService
 
             foreach (var item in imageUrls)
             {
-                string ext = Path.GetExtension(item);
-                if (!_allowImageExtArray.Any((x) => ext.StartsWith(x)))
+                string ext = Path.GetExtension(item).Split('?')[0]; // Discord 會在附檔名後面加上參數，GetExtension 不會排除掉參數，需要自行移除
+                if (!_allowImageExtArray.Any((x) => ext.ToLower() == x))
                     continue;
 
                 Log.Info($"添加圖片: {item}");
