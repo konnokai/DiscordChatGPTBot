@@ -54,33 +54,29 @@ namespace DiscordChatGPTBot.Interaction.OpenAI
         [RequireUserPermission(GuildPermission.Administrator)]
         public async Task Initialization([Summary("api-key", "OpenAI 的 API Key")] string apiKey)
         {
-            if (!apiKey.StartsWith("sk-") || apiKey.Length != 51)
+            if (!IsValidApiKey(apiKey))
             {
                 await Context.Interaction.SendErrorAsync("OpenAI API Key 格式錯誤，請輸入正確的 API Key");
                 return;
             }
 
-            string encToken = TokenManager.CreateToken(apiKey, _botConfig.AESKey);
 
-            using (var db = DataBase.MainDbContext.GetDbContext())
-            {
-                var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id);
-                if (guildConfig == null)
-                {
-                    guildConfig = new GuildConfig() { GuildId = Context.Guild.Id, OpenAIKey = encToken };
-                    db.GuildConfig.Add(guildConfig);
-                }
-                else
-                {
-                    guildConfig.OpenAIKey = encToken;
-                    db.GuildConfig.Update(guildConfig);
-                }
+            using var db = DataBase.MainDbContext.GetDbContext();
+            var guildConfig = db.GuildConfig.SingleOrDefault((x) => x.GuildId == Context.Guild.Id) ?? new GuildConfig() { GuildId = Context.Guild.Id };
+            guildConfig.OpenAIKey = TokenManager.CreateToken(apiKey, _botConfig.AESKey);
+            
+            db.GuildConfig.Update(guildConfig);
+            db.SaveChanges();
 
-                db.SaveChanges();
-                _service.RefreshGuildConfig();
+            _service.RefreshGuildConfig();
 
-                await Context.Interaction.SendConfirmAsync("已更新 OpenAI API Key", false, true);
-            }
+            await Context.Interaction.SendConfirmAsync("已更新 OpenAI API Key", false, true);
+        }
+
+        private bool IsValidApiKey(string apiKey)
+        {
+            return (apiKey.StartsWith("sk-proj") && apiKey.EndsWith('A') && apiKey.Length == 164) ||
+                   (apiKey.StartsWith("sk-") && apiKey.Length == 51);
         }
 
         [SlashCommand("revoke", "撤銷本伺服器的 OpenAI API Key 並取消使用 ChatGPT 聊天功能")]

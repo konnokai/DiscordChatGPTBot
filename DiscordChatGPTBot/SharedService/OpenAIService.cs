@@ -29,15 +29,17 @@ namespace DiscordChatGPTBot.SharedService.OpenAIService
 
         public void RefreshChannelConfig()
         {
-            using var db = DataBase.MainDbContext.GetDbContext();
             _channelConfigs.Clear();
+
+            using var db = DataBase.MainDbContext.GetDbContext();
             _channelConfigs.AddRange(db.ChannelConfig.AsNoTracking());
         }
 
         public void RefreshGuildConfig()
         {
-            using var db = DataBase.MainDbContext.GetDbContext();
             _guildOpenAIKey.Clear();
+
+            using var db = DataBase.MainDbContext.GetDbContext();
             foreach (var item in db.GuildConfig.AsNoTracking())
             {
                 _guildOpenAIKey.AddOrUpdate(item.GuildId, item.OpenAIKey, (guildId, apiKey) => item.OpenAIKey);
