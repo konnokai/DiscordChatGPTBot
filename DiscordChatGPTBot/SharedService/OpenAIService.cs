@@ -11,7 +11,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAIService
 {
     public class OpenAIService : IInteractionService
     {
-        private string[] _allowImageExtArray = new[] { ".jpeg", ".jpg", ".gif", ".png" };
+        private readonly string[] _allowImageExtArray = new[] { ".jpeg", ".jpg", ".gif", ".png" };
         private readonly ConcurrentDictionary<string, List<ChatMessage>> _chatPrompt = new();
         private readonly ConcurrentDictionary<ulong, DateTime> _lastSendMessageTimestamp = new();
         private readonly ConcurrentDictionary<ulong, string> _guildOpenAIKey = new();
