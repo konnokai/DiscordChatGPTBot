@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   discord-chat-gpt:
     container_name: discord-chat-gpt
