@@ -272,7 +272,7 @@ namespace DiscordChatGPTBot.SharedService.OpenAIService
             try
             {
                 desApiKey = TokenManager.GetTokenValue(apiKey, _botConfig.AESKey);
-                if (string.IsNullOrEmpty(desApiKey) || desApiKey.Length != 51)
+                if (string.IsNullOrEmpty(desApiKey) || (desApiKey.Length != 51 && desApiKey.Length != 164))
                     throw new InvalidOperationException("APIKey 解密失敗");
             }
             catch
