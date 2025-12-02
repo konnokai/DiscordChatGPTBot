@@ -6,3 +6,6 @@ services:
       - ${PWD}/Data:/app/Data
       - ${PWD}/bot_config.json:/app/bot_config.json
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    network_mode: bridge
